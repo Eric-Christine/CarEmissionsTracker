@@ -1,4 +1,3 @@
-// HomeScreen.tsx
 import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
@@ -15,6 +14,7 @@ import {
 } from 'react-native';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Define interface for vehicle data
 interface VehicleData {
@@ -23,45 +23,84 @@ interface VehicleData {
   description: string;
 }
 
+// Updated CalculationRecord interface now stores emissions values in lbs
+interface CalculationRecord {
+  id: string;             // Unique id (e.g., a timestamp string)
+  date: string;           // ISO string for the calculation date
+  miles: string;
+  mpg: string;
+  emissionsPerDay: string;  // Emissions per day in lbs
+  emissionsPerWeek: string; // Emissions per week in lbs
+  emissionsPerYear: string; // Emissions per year in lbs
+  vehicleType: string;
+}
+
+// Helper function to save the calculation record in AsyncStorage
+const saveCalculationRecord = async (record: CalculationRecord) => {
+  try {
+    const existing = await AsyncStorage.getItem('@calculation_history');
+    const history: CalculationRecord[] = existing ? JSON.parse(existing) : [];
+    history.push(record);
+    await AsyncStorage.setItem('@calculation_history', JSON.stringify(history));
+  } catch (error) {
+    console.error('Error saving calculation record:', error);
+  }
+};
+
+// Helper function to format numbers with commas (e.g., 1000 => 1,000)
+const formatNumber = (value: string | number): string => {
+  const num = typeof value === 'number' ? value : Number(value);
+  return isNaN(num) ? String(value) : num.toLocaleString('en-US');
+};
+
+// Define our available vehicle data
+const vehicleData: { [key: string]: VehicleData } = {
+  'Small Car': {
+    type: 'Small Car',
+    mpg: 32,
+    description: 'Compact or sedan (e.g., Honda Accord, Toyota Corolla)',
+  },
+  'Hybrid Car': {
+    type: 'Hybrid Car',
+    mpg: 45,
+    description: 'Compact or sedan (e.g., Honda Civic Hybrid, Toyota Prius)',
+  },
+  'Large Car': {
+    type: 'Large Car',
+    mpg: 27,
+    description: 'Full-size sedan (e.g., Toyota Camry, Honda Accord)',
+  },
+  'SUV': {
+    type: 'SUV',
+    mpg: 25,
+    description: 'Sport Utility Vehicle (e.g., Ford Explorer, Honda CR-V)',
+  },
+  'Truck': {
+    type: 'Truck',
+    mpg: 18,
+    description: 'Pickup truck (e.g., Ford F-150, Toyota Tundra)',
+  },
+};
+
 export default function HomeScreen() {
-  // Default miles is set to 27 (average commute distance)
+  // Define the default vehicle type
+  const defaultVehicleType = 'Small Car';
+
+  // Default input values; initialize mpg from the default vehicle's value.
   const [miles, setMiles] = useState<string>('27');
-  const [mpg, setMpg] = useState<string>('30');
-  const [emissions, setEmissions] = useState<string | null>(null);
-  const [vehicleType, setVehicleType] = useState<string>('Small Car');
+  const [vehicleType, setVehicleType] = useState<string>(defaultVehicleType);
+  const [mpg, setMpg] = useState<string>(String(vehicleData[defaultVehicleType].mpg));
+  const [emissions, setEmissions] = useState<string | null>(null); // Daily emissions (in lbs)
   const [isCalculating, setIsCalculating] = useState<boolean>(false);
   const [lastCalculation, setLastCalculation] = useState<Date | null>(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
 
-  // Enhanced vehicle data with descriptions
-  const vehicleData: { [key: string]: VehicleData } = {
-    'Small Car': {
-      type: 'Small Car',
-      mpg: 30,
-      description: 'Compact or sedan (e.g., Honda Civic, Toyota Corolla)',
-    },
-    'Large Car': {
-      type: 'Large Car',
-      mpg: 25,
-      description: 'Full-size sedan (e.g., Toyota Camry, Honda Accord)',
-    },
-    'SUV': {
-      type: 'SUV',
-      mpg: 20,
-      description: 'Sport Utility Vehicle (e.g., Ford Explorer, Honda CR-V)',
-    },
-    'Truck': {
-      type: 'Truck',
-      mpg: 15,
-      description: 'Pickup truck (e.g., Ford F-150, Toyota Tundra)',
-    },
-  };
-
-  // Reset emissions when inputs change
+  // Reset displayed emissions when inputs change
   useEffect(() => {
     setEmissions(null);
   }, [miles, mpg, vehicleType]);
 
+  // When the user selects a vehicle type, update both vehicleType and mpg using the default MPG.
   const handleVehicleTypeChange = (selectedType: string) => {
     setVehicleType(selectedType);
     setMpg(String(vehicleData[selectedType].mpg));
@@ -72,18 +111,12 @@ export default function HomeScreen() {
     const mpgNum = parseFloat(mpg);
 
     if (isNaN(milesNum) || milesNum <= 0) {
-      Alert.alert(
-        'Invalid Mileage',
-        'Please enter a valid number of miles greater than 0.'
-      );
+      Alert.alert('Invalid Mileage', 'Please enter a valid number of miles greater than 0.');
       return false;
     }
 
     if (isNaN(mpgNum) || mpgNum <= 0) {
-      Alert.alert(
-        'Invalid MPG',
-        'Please enter a valid MPG value greater than 0.'
-      );
+      Alert.alert('Invalid MPG', 'Please enter a valid MPG value greater than 0.');
       return false;
     }
 
@@ -105,19 +138,41 @@ export default function HomeScreen() {
   const calculateEmissions = (bypassValidation: boolean = false): void => {
     if (!bypassValidation && !validateInputs()) return;
 
+    // Capture the current miles value so that we record exactly what the user input.
+    const currentMiles = miles;
+
     setIsCalculating(true);
     Keyboard.dismiss();
 
-    // Simulate calculation time for better UX
+    // Simulate calculation time for improved UX
     setTimeout(() => {
-      const milesNum = parseFloat(miles);
+      const milesNum = parseFloat(currentMiles);
       const mpgNum = parseFloat(mpg);
       const gallonsUsed = milesNum / mpgNum;
-      const co2Emissions = gallonsUsed * 8.887;
+      // Calculate CO₂ emissions using 19.6 lbs CO₂ per gallon (EPA factor)
+      const emissionsPerDayLbs = (gallonsUsed * 19.6).toFixed(2);
+      const emissionsPerWeekLbs = (gallonsUsed * 19.6 * 5).toFixed(2);      // 5 days per week
+      const emissionsPerYearLbs = (gallonsUsed * 19.6 * 5 * 52).toFixed(2);   // 52 weeks per year
 
-      setEmissions(co2Emissions.toFixed(2));
-      setLastCalculation(new Date());
+      setEmissions(emissionsPerDayLbs);
+      const calculationTime = new Date();
+      setLastCalculation(calculationTime);
       setIsCalculating(false);
+
+      // Create a record with emissions values in lbs
+      const record: CalculationRecord = {
+        id: calculationTime.getTime().toString(),
+        date: calculationTime.toISOString(),
+        // Use the captured currentMiles so that it reflects the user's input at calculation time.
+        miles: currentMiles,
+        mpg,
+        emissionsPerDay: emissionsPerDayLbs,
+        emissionsPerWeek: emissionsPerWeekLbs,
+        emissionsPerYear: emissionsPerYearLbs,
+        vehicleType,
+      };
+
+      saveCalculationRecord(record);
     }, 800);
   };
 
@@ -127,38 +182,26 @@ export default function HomeScreen() {
     return 'High environmental impact - Consider carpooling or alternative transport';
   };
 
-  // Calculate weekly and yearly emissions and carbon credits
-  const tripEmissionsKg = emissions ? parseFloat(emissions) : 0;
-  const weeklyEmissionsKg = emissions ? (tripEmissionsKg * 5).toFixed(2) : null;
-  const yearlyEmissionKg = emissions ? (tripEmissionsKg * 5 * 52).toFixed(2) : null;
-  const yearlyCarbonCredits = emissions
-    ? (tripEmissionsKg * 5 * 52 / 1000).toFixed(2)
-    : null;
-
-  // Helper function: convert kg to lbs (1 kg = 2.20462 lbs)
-  const convertKgToLbs = (kg: number): string => (kg * 2.20462).toFixed(2);
-
-  // Calculate urban trees equivalent:
-  // 1 urban tree offsets ~86.17 lbs of CO₂e.
-  // Convert yearly emissions from kg to lbs, then divide by 86.17.
-  const urbanTrees = emissions
-    ? ((parseFloat(yearlyEmissionKg!) * 2.20462) / 86.17).toFixed(0)
-    : null;
+  // Derived values for display (all in lbs)
+  const dailyEmissions = emissions ? parseFloat(emissions) : 0;
+  const weeklyEmissions = emissions ? (dailyEmissions * 5).toFixed(0) : null;
+  const yearlyEmissions = emissions ? (dailyEmissions * 5 * 52).toFixed(0) : null;
+  const yearlyCarbonCredits = emissions ? (dailyEmissions * 5 * 52 / 2204.62).toFixed(2) : null;
+  const urbanTrees = yearlyEmissions ? (parseFloat(yearlyEmissions) / 86.17).toFixed(0) : null;
 
   return (
     <ScrollView contentContainerStyle={styles.scrollContainer}>
       <ThemedView style={styles.container}>
         <ThemedText type="title" style={styles.title}>
-          🌱 Car Emissions Calculator
+          Car Commute Calculator
         </ThemedText>
-
         <ThemedText style={styles.description}>
           Calculate your carbon footprint by entering your trip details below.
-          Help protect our environment by tracking your CO₂ emissions.
         </ThemedText>
 
+        {/* Distance Input */}
         <View style={styles.inputGroup}>
-          <ThemedText style={styles.label}>Distance Traveled</ThemedText>
+          <ThemedText style={styles.label}>Distance Traveled Per Day (Miles)</ThemedText>
           <View style={styles.inputRow}>
             <TextInput
               style={[styles.input, { flex: 1 }]}
@@ -168,26 +211,19 @@ export default function HomeScreen() {
               onChangeText={setMiles}
               placeholderTextColor="#666"
             />
-            <TouchableOpacity
-              style={styles.okButton}
-              onPress={() => Keyboard.dismiss()}
-            >
+            <TouchableOpacity style={styles.okButton} onPress={() => Keyboard.dismiss()}>
               <ThemedText style={styles.okButtonText}>OK</ThemedText>
             </TouchableOpacity>
           </View>
         </View>
 
+        {/* Vehicle Information */}
         <View style={styles.sectionContainer}>
           <ThemedText style={styles.sectionTitle}>Vehicle Information</ThemedText>
           <View style={styles.inputGroup}>
             <ThemedText style={styles.label}>Select Vehicle Type</ThemedText>
-            <TouchableOpacity
-              style={styles.dropdownButton}
-              onPress={() => setIsDropdownOpen(true)}
-            >
-              <ThemedText style={styles.dropdownButtonText}>
-                {vehicleType}
-              </ThemedText>
+            <TouchableOpacity style={styles.dropdownButton} onPress={() => setIsDropdownOpen(true)}>
+              <ThemedText style={styles.dropdownButtonText}>{vehicleType}</ThemedText>
               <ThemedText style={styles.dropdownIcon}>▼</ThemedText>
             </TouchableOpacity>
 
@@ -204,9 +240,7 @@ export default function HomeScreen() {
               >
                 <View style={styles.dropdownContainer}>
                   <View style={styles.dropdownHeader}>
-                    <ThemedText style={styles.dropdownTitle}>
-                      Select Vehicle Type
-                    </ThemedText>
+                    <ThemedText style={styles.dropdownTitle}>Select Vehicle Type</ThemedText>
                     <TouchableOpacity onPress={() => setIsDropdownOpen(false)}>
                       <ThemedText style={styles.closeButton}>✕</ThemedText>
                     </TouchableOpacity>
@@ -226,9 +260,7 @@ export default function HomeScreen() {
                         }}
                       >
                         <View>
-                          <ThemedText style={styles.dropdownItemText}>
-                            {item.type}
-                          </ThemedText>
+                          <ThemedText style={styles.dropdownItemText}>{item.type}</ThemedText>
                           <ThemedText style={styles.dropdownItemDescription}>
                             {item.description}
                           </ThemedText>
@@ -248,6 +280,7 @@ export default function HomeScreen() {
           </View>
         </View>
 
+        {/* Fuel Efficiency */}
         <View style={styles.sectionContainer}>
           <ThemedText style={styles.sectionTitle}>Fuel Efficiency</ThemedText>
           <View style={styles.efficiencyContainer}>
@@ -270,12 +303,13 @@ export default function HomeScreen() {
                 placeholderTextColor="#666"
               />
               <ThemedText style={styles.helperText}>
-                Only enter if you know your vehicle's exact fuel efficiency
+                Only enter if you know your vehicle's exact fuel efficiency.
               </ThemedText>
             </View>
           </View>
         </View>
 
+        {/* Calculation Button */}
         <TouchableOpacity
           style={styles.calculateButton}
           onPress={() => calculateEmissions()}
@@ -284,61 +318,54 @@ export default function HomeScreen() {
           {isCalculating ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <ThemedText style={styles.buttonText}>
-              Calculate CO₂ Emissions
-            </ThemedText>
+            <ThemedText style={styles.buttonText}>Calculate CO₂ Emissions</ThemedText>
           )}
         </TouchableOpacity>
 
+        {/* Display Results */}
         {emissions !== null && (
           <View style={styles.resultsContainer}>
             <ThemedText style={styles.emissionsResult}>
-              Estimated CO₂ Emissions (Trip):
+              Estimated CO₂ Emissions (Per Day):{' '}
               <ThemedText style={styles.emissionsNumber}>
-                {' '}{emissions} kg ({convertKgToLbs(parseFloat(emissions))} lbs)
+                {formatNumber(emissions)} lbs
               </ThemedText>
             </ThemedText>
             <ThemedText style={styles.emissionsResult}>
-              Estimated Weekly CO₂ Emissions:
+              Estimated Weekly CO₂ Emissions (5 days per week):{'\n'}
               <ThemedText style={styles.emissionsNumber}>
-                {' '}{(tripEmissionsKg * 5).toFixed(2)} kg ({convertKgToLbs(tripEmissionsKg * 5)} lbs)
+                {formatNumber(weeklyEmissions)} lbs
               </ThemedText>
             </ThemedText>
             <ThemedText style={styles.emissionsResult}>
-              Estimated Yearly CO₂ Emissions:
+              Estimated Yearly CO₂ Emissions:{'\n'}
               <ThemedText style={styles.emissionsNumber}>
-                {' '}{yearlyEmissionKg} kg ({convertKgToLbs(parseFloat(yearlyEmissionKg!))} lbs)
+                {formatNumber(yearlyEmissions)} lbs
               </ThemedText>
             </ThemedText>
 
+            {/* Carbon Credits */}
             <View style={styles.carbonCreditContainer}>
               <ThemedText style={styles.carbonCreditTitle}>
                 Carbon Credit Equivalent
               </ThemedText>
               <ThemedText style={styles.carbonCreditText}>
-                One carbon credit is equivalent to 1,000 kg (1 metric ton) of CO₂.
-              </ThemedText>
-              <ThemedText style={styles.carbonCreditText}>
-                Your trip's emissions of{' '}
-                <ThemedText style={styles.emissionsNumber}>
-                  {emissions} kg
-                </ThemedText>{' '}
-                represent{' '}
-                {(parseFloat(emissions) / 1000 * 100).toFixed(2)}% of a carbon credit.
+                One carbon credit is equivalent to 2,204.62 lbs (1 metric ton) of CO₂.
               </ThemedText>
               <ThemedText style={styles.carbonCreditText}>
                 Your estimated yearly trip emissions of{' '}
                 <ThemedText style={styles.emissionsNumber}>
-                  {yearlyEmissionKg} kg
+                  {formatNumber(yearlyEmissions)} lbs
                 </ThemedText>{' '}
                 represent{' '}
                 <ThemedText style={styles.emissionsNumber}>
-                  {yearlyCarbonCredits}
+                  {formatNumber(yearlyCarbonCredits)}
                 </ThemedText>{' '}
                 carbon credits.
               </ThemedText>
             </View>
 
+            {/* Urban Trees Equivalent */}
             <View style={styles.urbanTreesContainer}>
               <ThemedText style={styles.urbanTreesTitle}>
                 Urban Trees Equivalent
@@ -346,25 +373,23 @@ export default function HomeScreen() {
               <ThemedText style={styles.urbanTreesText}>
                 Your estimated yearly trip emissions of{' '}
                 <ThemedText style={styles.emissionsNumber}>
-                  {yearlyEmissionKg} kg
+                  {formatNumber(yearlyEmissions)} lbs
                 </ThemedText>{' '}
-                equals{' '}
+                offset approximately{' '}
                 <ThemedText style={styles.emissionsNumber}>
-                  {urbanTrees}
+                  {formatNumber(urbanTrees)}
                 </ThemedText>{' '}
                 urban trees.
               </ThemedText>
               <ThemedText style={styles.urbanTreesText}>
-                (Conversion: 1 kg = 2.20462 lbs; 1 urban tree offsets ~86.17 lbs of CO₂e)
+                (Conversion: 1 urban tree offsets ~86.17 lbs of CO₂)
               </ThemedText>
             </View>
 
             <TouchableOpacity
               style={styles.offsetButton}
               onPress={() =>
-                Linking.openURL(
-                  'https://terrapass.com/product/productindividuals-families/'
-                )
+                Linking.openURL('https://terrapass.com/product/productindividuals-families/')
               }
             >
               <ThemedText style={styles.offsetButtonText}>
@@ -373,7 +398,7 @@ export default function HomeScreen() {
             </TouchableOpacity>
 
             <ThemedText style={styles.impactText}>
-              {getEmissionsImpact(parseFloat(emissions))}
+              {getEmissionsImpact(dailyEmissions)}
             </ThemedText>
 
             {lastCalculation && (
@@ -392,11 +417,11 @@ const styles = StyleSheet.create({
   scrollContainer: {
     flexGrow: 1,
     backgroundColor: '#fff',
-    paddingBottom: 60, // Extra bottom padding for scrolling
+    paddingBottom: 60,
   },
   container: {
     padding: 20,
-    paddingTop: 40, // Extra top padding to keep title at the top
+    paddingTop: 40,
     gap: 16,
   },
   title: {
@@ -409,11 +434,11 @@ const styles = StyleSheet.create({
   description: {
     fontSize: 16,
     textAlign: 'center',
-    marginBottom: 20,
+    marginBottom: 10,
     color: '#666',
   },
   sectionContainer: {
-    marginBottom: 24,
+    marginBottom: 10,
     backgroundColor: '#f8f9fa',
     borderRadius: 12,
     padding: 16,
@@ -425,7 +450,7 @@ const styles = StyleSheet.create({
     color: '#2196F3',
   },
   inputGroup: {
-    marginBottom: 20,
+    marginBottom: 10,
   },
   label: {
     fontSize: 16,
@@ -565,7 +590,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
     marginTop: 0,
-    marginBottom: 50,
+    marginBottom: 10,
   },
   buttonText: {
     color: '#fff',
@@ -573,24 +598,25 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   resultsContainer: {
-    marginTop: 20,
-    marginBottom: 100,
+    marginTop: 0,
+    marginBottom: 50,
     padding: 15,
     backgroundColor: '#f5f5f5',
     borderRadius: 8,
-    alignItems: 'center',
+    alignItems: 'flex-start',
   },
   emissionsResult: {
     fontSize: 18,
     fontWeight: '600',
     color: '#333',
     marginBottom: 8,
-    textAlign: 'center',
+    textAlign: 'left',
   },
   emissionsNumber: {
     fontSize: 20,
     fontWeight: 'bold',
     color: '#1976d2',
+    textAlign: 'left',
   },
   impactText: {
     fontSize: 16,
