@@ -11,6 +11,7 @@ import {
   FlatList,
   ScrollView,
   Linking,
+  useColorScheme,
 } from 'react-native';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
@@ -82,7 +83,324 @@ const vehicleData: { [key: string]: VehicleData } = {
   },
 };
 
+// Theme colors
+const colors = {
+  light: {
+    background: '#fff',
+    surface: '#f8f9fa',
+    primary: '#2196F3',
+    primaryDark: '#1976d2',
+    text: '#333',
+    textSecondary: '#666',
+    textLight: '#999',
+    border: '#ccc',
+    success: '#388E3C',
+    successLight: '#e8f5e9',
+    successDark: '#558B2F',
+    inputBackground: '#fff',
+    modalOverlay: 'rgba(0, 0, 0, 0.5)',
+    selectedBackground: '#e3f2fd',
+  },
+  dark: {
+    background: '#121212',
+    surface: '#1e1e1e',
+    primary: '#90caf9',
+    primaryDark: '#64b5f6',
+    text: '#e0e0e0',
+    textSecondary: '#b0b0b0',
+    textLight: '#757575',
+    border: '#404040',
+    success: '#81c784',
+    successLight: '#1b3320',
+    successDark: '#a5d6a7',
+    inputBackground: '#2c2c2c',
+    modalOverlay: 'rgba(0, 0, 0, 0.7)',
+    selectedBackground: '#1e3646',
+  }
+};
+
+// Create themed styles based on the current theme
+const createThemedStyles = (theme: 'light' | 'dark') =>
+  StyleSheet.create({
+    scrollContainer: {
+      flexGrow: 1,
+      backgroundColor: colors[theme].background,
+      paddingBottom: 60,
+    },
+    container: {
+      padding: 20,
+      paddingTop: 40,
+      backgroundColor: colors[theme].background,
+    },
+    title: {
+      fontSize: 24,
+      fontWeight: 'bold',
+      marginBottom: 10,
+      marginTop: 30,
+      textAlign: 'center',
+      color: colors[theme].text,
+    },
+    description: {
+      fontSize: 16,
+      textAlign: 'center',
+      marginBottom: 10,
+      color: colors[theme].textSecondary,
+    },
+    sectionContainer: {
+      marginBottom: 10,
+      backgroundColor: colors[theme].surface,
+      borderRadius: 12,
+      padding: 16,
+    },
+    sectionTitle: {
+      fontSize: 18,
+      fontWeight: 'bold',
+      marginBottom: 16,
+      color: colors[theme].primary,
+    },
+    inputGroup: {
+      marginBottom: 10,
+    },
+    label: {
+      fontSize: 16,
+      fontWeight: '600',
+      marginBottom: 8,
+      color: colors[theme].text,
+    },
+    inputRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    input: {
+      borderWidth: 1,
+      borderColor: colors[theme].border,
+      borderRadius: 8,
+      padding: 12,
+      fontSize: 16,
+      backgroundColor: colors[theme].inputBackground,
+      color: colors[theme].text,
+    },
+    okButton: {
+      marginLeft: 8,
+      backgroundColor: colors[theme].primary,
+      paddingVertical: 8,
+      paddingHorizontal: 12,
+      borderRadius: 4,
+    },
+    okButtonText: {
+      color: theme === 'dark' ? '#000' : '#fff',
+      fontSize: 14,
+      fontWeight: '600',
+    },
+    helperText: {
+      fontSize: 12,
+      color: colors[theme].textSecondary,
+      marginTop: 4,
+    },
+    dropdownButton: {
+      height: 50,
+      width: '100%',
+      backgroundColor: colors[theme].inputBackground,
+      borderRadius: 8,
+      marginVertical: 8,
+      paddingHorizontal: 16,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      borderWidth: 1,
+      borderColor: colors[theme].border,
+      marginBottom: 10,
+    },
+    dropdownButtonText: {
+      fontSize: 16,
+      color: colors[theme].text,
+    },
+    dropdownIcon: {
+      fontSize: 14,
+      color: colors[theme].textSecondary,
+    },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: colors[theme].modalOverlay,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    dropdownContainer: {
+      width: '90%',
+      maxHeight: '80%',
+      backgroundColor: colors[theme].surface,
+      borderRadius: 12,
+      overflow: 'hidden',
+    },
+    dropdownHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: colors[theme].border,
+    },
+    dropdownTitle: {
+      fontSize: 18,
+      fontWeight: 'bold',
+      color: colors[theme].text,
+    },
+    closeButton: {
+      fontSize: 20,
+      color: colors[theme].textSecondary,
+      padding: 4,
+    },
+    dropdownItem: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: colors[theme].border,
+    },
+    dropdownItemSelected: {
+      backgroundColor: colors[theme].selectedBackground,
+    },
+    dropdownItemText: {
+      fontSize: 16,
+      marginBottom: 4,
+      color: colors[theme].text,
+    },
+    dropdownItemDescription: {
+      fontSize: 12,
+      color: colors[theme].textSecondary,
+    },
+    selectedCheck: {
+      color: colors[theme].primary,
+      fontSize: 20,
+      fontWeight: 'bold',
+    },
+    efficiencyContainer: {
+      marginBottom: 16,
+    },
+    defaultMpgBox: {
+      backgroundColor: colors[theme].selectedBackground,
+      padding: 12,
+      borderRadius: 8,
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    defaultMpgLabel: {
+      fontSize: 14,
+      color: colors[theme].primaryDark,
+    },
+    defaultMpgValue: {
+      fontSize: 16,
+      fontWeight: 'bold',
+      color: colors[theme].primaryDark,
+    },
+    customMpgContainer: {
+      marginTop: 8,
+    },
+    calculateButton: {
+      backgroundColor: colors[theme].primary,
+      padding: 15,
+      borderRadius: 8,
+      alignItems: 'center',
+      marginTop: 0,
+      marginBottom: 10,
+    },
+    buttonText: {
+      color: theme === 'dark' ? '#000' : '#fff',
+      fontSize: 18,
+      fontWeight: '600',
+    },
+    resultsContainer: {
+      marginTop: 0,
+      marginBottom: 50,
+      padding: 15,
+      backgroundColor: colors[theme].surface,
+      borderRadius: 8,
+      alignItems: 'flex-start',
+    },
+    emissionsResult: {
+      fontSize: 18,
+      fontWeight: '600',
+      color: colors[theme].text,
+      marginBottom: 8,
+      textAlign: 'left',
+    },
+    emissionsNumber: {
+      fontSize: 20,
+      fontWeight: 'bold',
+      color: colors[theme].primary,
+      textAlign: 'left',
+    },
+    impactText: {
+      fontSize: 16,
+      fontStyle: 'italic',
+      color: colors[theme].textSecondary,
+      marginBottom: 4,
+      textAlign: 'center',
+    },
+    timestamp: {
+      fontSize: 12,
+      color: colors[theme].textLight,
+      marginTop: 4,
+      textAlign: 'center',
+    },
+    carbonCreditContainer: {
+      marginTop: 20,
+      padding: 15,
+      backgroundColor: colors[theme].successLight,
+      borderRadius: 8,
+      alignItems: 'center',
+    },
+    carbonCreditTitle: {
+      fontSize: 18,
+      fontWeight: 'bold',
+      color: colors[theme].success,
+      marginBottom: 8,
+    },
+    carbonCreditText: {
+      fontSize: 14,
+      color: colors[theme].textSecondary,
+      textAlign: 'center',
+    },
+    urbanTreesContainer: {
+      marginTop: 20,
+      padding: 15,
+      backgroundColor: colors[theme].successLight,
+      borderRadius: 8,
+      alignItems: 'center',
+    },
+    urbanTreesTitle: {
+      fontSize: 18,
+      fontWeight: 'bold',
+      color: colors[theme].success,
+      marginBottom: 8,
+    },
+    urbanTreesText: {
+      fontSize: 14,
+      color: colors[theme].textSecondary,
+      textAlign: 'center',
+    },
+    offsetButton: {
+      marginTop: 16,
+      backgroundColor: colors[theme].success,
+      paddingVertical: 10,
+      paddingHorizontal: 16,
+      borderRadius: 8,
+    },
+    offsetButtonText: {
+      color: theme === 'dark' ? '#000' : '#fff',
+      fontSize: 16,
+      fontWeight: '600',
+    },
+  });
+
 export default function HomeScreen() {
+  // Detect system color scheme
+  const colorScheme = useColorScheme();
+  const theme = colorScheme === 'dark' ? 'dark' : 'light';
+  const styles = createThemedStyles(theme);
+
   // Define the default vehicle type
   const defaultVehicleType = 'Small Car';
 
@@ -163,7 +481,6 @@ export default function HomeScreen() {
       const record: CalculationRecord = {
         id: calculationTime.getTime().toString(),
         date: calculationTime.toISOString(),
-        // Use the captured currentMiles so that it reflects the user's input at calculation time.
         miles: currentMiles,
         mpg,
         emissionsPerDay: emissionsPerDayLbs,
@@ -201,7 +518,9 @@ export default function HomeScreen() {
 
         {/* Distance Input */}
         <View style={styles.inputGroup}>
-          <ThemedText style={styles.label}>Distance Traveled Per Day (Miles)</ThemedText>
+          <ThemedText style={styles.label}>
+            Distance Traveled Per Day (Miles)
+          </ThemedText>
           <View style={styles.inputRow}>
             <TextInput
               style={[styles.input, { flex: 1 }]}
@@ -209,7 +528,7 @@ export default function HomeScreen() {
               keyboardType="numeric"
               value={miles}
               onChangeText={setMiles}
-              placeholderTextColor="#666"
+              placeholderTextColor={colors[theme].textSecondary}
             />
             <TouchableOpacity style={styles.okButton} onPress={() => Keyboard.dismiss()}>
               <ThemedText style={styles.okButtonText}>OK</ThemedText>
@@ -300,7 +619,7 @@ export default function HomeScreen() {
                 keyboardType="numeric"
                 value={mpg}
                 onChangeText={setMpg}
-                placeholderTextColor="#666"
+                placeholderTextColor={colors[theme].textSecondary}
               />
               <ThemedText style={styles.helperText}>
                 Only enter if you know your vehicle's exact fuel efficiency.
@@ -316,7 +635,7 @@ export default function HomeScreen() {
           disabled={isCalculating}
         >
           {isCalculating ? (
-            <ActivityIndicator color="#fff" />
+            <ActivityIndicator color={theme === 'dark' ? '#000' : '#fff'} />
           ) : (
             <ThemedText style={styles.buttonText}>Calculate CO₂ Emissions</ThemedText>
           )}
@@ -412,273 +731,3 @@ export default function HomeScreen() {
     </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  scrollContainer: {
-    flexGrow: 1,
-    backgroundColor: '#fff',
-    paddingBottom: 60,
-  },
-  container: {
-    padding: 20,
-    paddingTop: 40,
-    gap: 16,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 10,
-    marginTop: 30,
-    textAlign: 'center',
-  },
-  description: {
-    fontSize: 16,
-    textAlign: 'center',
-    marginBottom: 10,
-    color: '#666',
-  },
-  sectionContainer: {
-    marginBottom: 10,
-    backgroundColor: '#f8f9fa',
-    borderRadius: 12,
-    padding: 16,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 16,
-    color: '#2196F3',
-  },
-  inputGroup: {
-    marginBottom: 10,
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  inputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    backgroundColor: '#fff',
-  },
-  okButton: {
-    marginLeft: 8,
-    backgroundColor: '#2196F3',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 4,
-  },
-  okButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  helperText: {
-    fontSize: 12,
-    color: '#666',
-    marginTop: 4,
-  },
-  dropdownButton: {
-    height: 50,
-    width: '100%',
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    marginVertical: 8,
-    paddingHorizontal: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderWidth: 1,
-    borderColor: '#ccc',
-    marginBottom: 10,
-  },
-  dropdownButtonText: {
-    fontSize: 16,
-  },
-  dropdownIcon: {
-    fontSize: 14,
-    color: '#666',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  dropdownContainer: {
-    width: '90%',
-    maxHeight: '80%',
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  dropdownHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  dropdownTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  closeButton: {
-    fontSize: 20,
-    color: '#666',
-    padding: 4,
-  },
-  dropdownItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  dropdownItemSelected: {
-    backgroundColor: '#e3f2fd',
-  },
-  dropdownItemText: {
-    fontSize: 16,
-    marginBottom: 4,
-  },
-  dropdownItemDescription: {
-    fontSize: 12,
-    color: '#666',
-  },
-  selectedCheck: {
-    color: '#2196F3',
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  efficiencyContainer: {
-    gap: 16,
-  },
-  defaultMpgBox: {
-    backgroundColor: '#e3f2fd',
-    padding: 12,
-    borderRadius: 8,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  defaultMpgLabel: {
-    fontSize: 14,
-    color: '#1976d2',
-  },
-  defaultMpgValue: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#1976d2',
-  },
-  customMpgContainer: {
-    marginTop: 8,
-  },
-  calculateButton: {
-    backgroundColor: '#2196F3',
-    padding: 15,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 0,
-    marginBottom: 10,
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  resultsContainer: {
-    marginTop: 0,
-    marginBottom: 50,
-    padding: 15,
-    backgroundColor: '#f5f5f5',
-    borderRadius: 8,
-    alignItems: 'flex-start',
-  },
-  emissionsResult: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 8,
-    textAlign: 'left',
-  },
-  emissionsNumber: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#1976d2',
-    textAlign: 'left',
-  },
-  impactText: {
-    fontSize: 16,
-    fontStyle: 'italic',
-    color: '#555',
-    marginBottom: 4,
-    textAlign: 'center',
-  },
-  timestamp: {
-    fontSize: 12,
-    color: '#999',
-    marginTop: 4,
-    textAlign: 'center',
-  },
-  carbonCreditContainer: {
-    marginTop: 20,
-    padding: 15,
-    backgroundColor: '#e8f5e9',
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  carbonCreditTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#388E3C',
-    marginBottom: 8,
-  },
-  carbonCreditText: {
-    fontSize: 14,
-    color: '#555',
-    textAlign: 'center',
-  },
-  urbanTreesContainer: {
-    marginTop: 20,
-    padding: 15,
-    backgroundColor: '#f1f8e9',
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  urbanTreesTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#558B2F',
-    marginBottom: 8,
-  },
-  urbanTreesText: {
-    fontSize: 14,
-    color: '#555',
-    textAlign: 'center',
-  },
-  offsetButton: {
-    marginTop: 16,
-    backgroundColor: '#388E3C',
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-  },
-  offsetButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-});
-
-export { HomeScreen };

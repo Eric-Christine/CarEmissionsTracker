@@ -4,7 +4,8 @@ import {
   StyleSheet, 
   FlatList, 
   TouchableOpacity, 
-  Alert 
+  Alert,
+  useColorScheme 
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ThemedText } from '@/components/ThemedText';
@@ -23,6 +24,32 @@ interface CalculationRecord {
   vehicleType: string;
 }
 
+// Theme colors consistent with the app's theme
+const colors = {
+  light: {
+    background: '#fff',
+    surface: '#f8f9fa',
+    primary: '#2196F3',
+    danger: '#d32f2f',
+    text: '#333',
+    textSecondary: '#666',
+    textLight: '#999',
+    border: '#ccc',
+    cardBackground: '#f5f5f5',
+  },
+  dark: {
+    background: '#121212',
+    surface: '#1e1e1e',
+    primary: '#90caf9',
+    danger: '#ef5350',
+    text: '#e0e0e0',
+    textSecondary: '#b0b0b0',
+    textLight: '#757575',
+    border: '#404040',
+    cardBackground: '#2c2c2c',
+  }
+};
+
 // Helper function to format numeric strings with commas
 const formatNumber = (value: string): string => {
   const num = Number(value);
@@ -31,14 +58,17 @@ const formatNumber = (value: string): string => {
 
 export default function HistoryScreen() {
   const [history, setHistory] = useState<CalculationRecord[]>([]);
+  const colorScheme = useColorScheme();
+  const theme = colorScheme === 'dark' ? 'dark' : 'light';
+  const themeColors = colors[theme];
 
-  // Load calculation history from AsyncStorage and reverse the order
+  // Load calculation history from AsyncStorage
   const loadHistory = async () => {
     try {
       const jsonValue = await AsyncStorage.getItem('@calculation_history');
       if (jsonValue) {
-        // Parse and reverse the array so that the newest records appear first
         const parsedHistory: CalculationRecord[] = JSON.parse(jsonValue);
+        // Reverse the history so the most recent record shows first
         setHistory(parsedHistory.reverse());
       } else {
         setHistory([]);
@@ -48,14 +78,13 @@ export default function HistoryScreen() {
     }
   };
 
-  // Use useFocusEffect to load history each time the screen is focused.
   useFocusEffect(
     useCallback(() => {
       loadHistory();
     }, [])
   );
 
-  // Clear history with a confirmation alert
+  // Clear history with confirmation
   const clearHistory = async () => {
     Alert.alert(
       'Clear History',
@@ -78,41 +107,32 @@ export default function HistoryScreen() {
     );
   };
 
-  // Render each record in the list with formatted numbers
-  const renderItem = ({ item }: { item: CalculationRecord }) => {
-    const formattedMiles = formatNumber(item.miles);
-    const formattedMpg = formatNumber(item.mpg);
-    const formattedEmissionsPerDay = formatNumber(item.emissionsPerDay);
-    const formattedEmissionsPerWeek = formatNumber(item.emissionsPerWeek);
-    const formattedEmissionsPerYear = formatNumber(item.emissionsPerYear);
-
-    return (
-      <View style={styles.recordItem}>
-        <ThemedText style={styles.recordDate}>
-          {new Date(item.date).toLocaleString()}
-        </ThemedText>
-        <ThemedText style={styles.recordText}>
-          Vehicle: {item.vehicleType}
-        </ThemedText>
-        <ThemedText style={styles.recordText}>
-          Miles: {formattedMiles} | MPG: {formattedMpg}
-        </ThemedText>
-        <ThemedText style={styles.recordText}>
-          Emissions Per Day: {formattedEmissionsPerDay} lbs CO₂
-        </ThemedText>
-        <ThemedText style={styles.recordText}>
-          Emissions Per Week: {formattedEmissionsPerWeek} lbs CO₂
-        </ThemedText>
-        <ThemedText style={styles.recordText}>
-          Emissions Per Year: {formattedEmissionsPerYear} lbs CO₂
-        </ThemedText>
-      </View>
-    );
-  };
+  const renderItem = ({ item }: { item: CalculationRecord }) => (
+    <View style={[styles.recordItem, { backgroundColor: themeColors.cardBackground }]}>
+      <ThemedText style={[styles.recordDate, { color: themeColors.textSecondary }]}>
+        {new Date(item.date).toLocaleString()}
+      </ThemedText>
+      <ThemedText style={[styles.recordText, { color: themeColors.text }]}>
+        Vehicle: {item.vehicleType}
+      </ThemedText>
+      <ThemedText style={[styles.recordText, { color: themeColors.text }]}>
+        Miles: {formatNumber(item.miles)} | MPG: {formatNumber(item.mpg)}
+      </ThemedText>
+      <ThemedText style={[styles.recordText, { color: themeColors.text }]}>
+        Emissions Per Day: {formatNumber(item.emissionsPerDay)} lbs CO₂
+      </ThemedText>
+      <ThemedText style={[styles.recordText, { color: themeColors.text }]}>
+        Emissions Per Week: {formatNumber(item.emissionsPerWeek)} lbs CO₂
+      </ThemedText>
+      <ThemedText style={[styles.recordText, { color: themeColors.text }]}>
+        Emissions Per Year: {formatNumber(item.emissionsPerYear)} lbs CO₂
+      </ThemedText>
+    </View>
+  );
 
   return (
-    <ThemedView style={styles.container}>
-      <ThemedText type="title" style={styles.title}>
+    <ThemedView style={[styles.container, { backgroundColor: themeColors.background }]}>
+      <ThemedText type="title" style={[styles.title, { color: themeColors.text }]}>
         Calculation History
       </ThemedText>
       <FlatList
@@ -120,17 +140,23 @@ export default function HistoryScreen() {
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         ListEmptyComponent={
-          <ThemedText style={styles.emptyText}>
+          <ThemedText style={[styles.emptyText, { color: themeColors.textLight }]}>
             No calculation history available.
           </ThemedText>
         }
         contentContainerStyle={styles.listContent}
       />
-      <TouchableOpacity style={styles.clearButton} onPress={clearHistory}>
-        <ThemedText style={styles.clearButtonText}>
-          Clear History
-        </ThemedText>
-      </TouchableOpacity>
+      {/* Render Clear History button only if there is at least one record */}
+      {history.length > 0 && (
+        <TouchableOpacity 
+          style={[styles.clearButton, { backgroundColor: themeColors.danger }]} 
+          onPress={clearHistory}
+        >
+          <ThemedText style={styles.clearButtonText}>
+            Clear History
+          </ThemedText>
+        </TouchableOpacity>
+      )}
     </ThemedView>
   );
 }
@@ -139,10 +165,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 20,
-    backgroundColor: '#fff',
   },
   title: {
     fontSize: 24,
+    fontWeight: 'bold',
     marginBottom: 16,
     marginTop: 100,
     textAlign: 'center',
@@ -151,32 +177,37 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   recordItem: {
-    backgroundColor: '#f5f5f5',
-    padding: 12,
-    borderRadius: 8,
+    padding: 16,
+    borderRadius: 12,
     marginBottom: 12,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
   recordDate: {
     fontSize: 14,
-    color: '#666',
-    marginBottom: 4,
+    marginBottom: 8,
   },
   recordText: {
     fontSize: 16,
-    color: '#333',
+    marginBottom: 4,
   },
   emptyText: {
     textAlign: 'center',
     fontSize: 16,
-    color: '#999',
     marginTop: 20,
   },
   clearButton: {
-    backgroundColor: '#d32f2f',
-    padding: 12,
-    borderRadius: 8,
+    padding: 16,
+    borderRadius: 12,
     alignItems: 'center',
     marginTop: 20,
+    marginBottom: 100,
   },
   clearButtonText: {
     color: '#fff',
