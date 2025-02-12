@@ -20,7 +20,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // Define interface for vehicle data
 interface VehicleData {
   type: string;
-  mpg: number;
+  mpg: number; // For non-electric vehicles; for E-bike this value is not used.
   description: string;
 }
 
@@ -54,12 +54,12 @@ const formatNumber = (value: string | number): string => {
   return isNaN(num) ? String(value) : num.toLocaleString('en-US');
 };
 
-// Define our available vehicle data
+// Define our available vehicle data, including Bus, E-bike, and Motorcycle as new options.
 const vehicleData: { [key: string]: VehicleData } = {
   'Small Car': {
     type: 'Small Car',
     mpg: 32,
-    description: 'Compact or sedan (e.g., Honda Accord, Toyota Corolla)',
+    description: 'Compact or sedan (e.g., Honda Civic, Toyota Corolla)',
   },
   'Hybrid Car': {
     type: 'Hybrid Car',
@@ -80,6 +80,24 @@ const vehicleData: { [key: string]: VehicleData } = {
     type: 'Truck',
     mpg: 18,
     description: 'Pickup truck (e.g., Ford F-150, Toyota Tundra)',
+  },
+  'Bus': {
+    type: 'Bus',
+    mpg: 6,
+    description:
+      'Transit bus (e.g., typical diesel-powered bus, ~6 MPG). Emissions are calculated per person based on half occupancy (15 passengers).',
+  },
+  'E-bike': {
+    type: 'E-bike',
+    mpg: 0, // Not applicable for electric bikes.
+    description:
+      'Electric bike powered by electricity. Emissions are calculated based on an average consumption of 0.04 kWh per mile and an average emission factor of 0.92 lbs CO₂ per kWh.',
+  },
+  'Motorcycle': {
+    type: 'Motorcycle',
+    mpg: 40, // Typical motorcycle MPG; adjust as needed.
+    description:
+      'Motorcycle (e.g., Harley Davidson, Yamaha). Generally more fuel efficient than cars. Emissions are calculated using gasoline consumption.',
   },
 };
 
@@ -433,12 +451,12 @@ export default function HomeScreen() {
       return false;
     }
 
-    if (isNaN(mpgNum) || mpgNum <= 0) {
+    if (vehicleType !== 'E-bike' && (isNaN(mpgNum) || mpgNum <= 0)) {
       Alert.alert('Invalid MPG', 'Please enter a valid MPG value greater than 0.');
       return false;
     }
 
-    if (mpgNum > 150) {
+    if (vehicleType !== 'E-bike' && mpgNum > 150) {
       Alert.alert(
         'MPG Verification',
         'The MPG value seems unusually high. Please verify your input.',
@@ -458,19 +476,53 @@ export default function HomeScreen() {
 
     // Capture the current miles value so that we record exactly what the user input.
     const currentMiles = miles;
-
     setIsCalculating(true);
     Keyboard.dismiss();
 
-    // Simulate calculation time for improved UX
     setTimeout(() => {
       const milesNum = parseFloat(currentMiles);
-      const mpgNum = parseFloat(mpg);
-      const gallonsUsed = milesNum / mpgNum;
-      // Calculate CO₂ emissions using 19.6 lbs CO₂ per gallon (EPA factor)
-      const emissionsPerDayLbs = (gallonsUsed * 19.6).toFixed(2);
-      const emissionsPerWeekLbs = (gallonsUsed * 19.6 * 5).toFixed(2);      // 5 days per week
-      const emissionsPerYearLbs = (gallonsUsed * 19.6 * 5 * 52).toFixed(2);   // 52 weeks per year
+      let emissionsPerDayLbs: string, emissionsPerWeekLbs: string, emissionsPerYearLbs: string;
+
+      if (vehicleType === 'Bus') {
+        // For Bus:
+        //   - Use a fuel emission factor of 22.45 lbs CO₂ per gallon (from 10.2 kg)
+        //   - Assume a fuel efficiency of 6 MPG
+        //   - Total bus emissions per mile = 22.45 / 6 ≈ 3.74 lbs/mile
+        //   - With half occupancy (15 passengers), per-person emissions = 3.74 / 15 ≈ 0.249 lbs/mile
+        const perMilePerPerson = 22.45 / 6 / 15;
+        emissionsPerDayLbs = (milesNum * perMilePerPerson).toFixed(2);
+        emissionsPerWeekLbs = (milesNum * perMilePerPerson * 5).toFixed(2);
+        emissionsPerYearLbs = (milesNum * perMilePerPerson * 5 * 52).toFixed(2);
+      } else if (vehicleType === 'E-bike') {
+        // For E-bike:
+        //   - Assume an average electricity consumption of 0.04 kWh per mile
+        //   - And an emission factor of 0.92 lbs CO₂ per kWh
+        //   - Emissions per mile = 0.04 * 0.92 ≈ 0.0368 lbs/mile
+        const consumptionPerMile = 0.04; // kWh per mile
+        const emissionFactor = 0.92; // lbs CO₂ per kWh
+        emissionsPerDayLbs = (milesNum * consumptionPerMile * emissionFactor).toFixed(2);
+        emissionsPerWeekLbs = (milesNum * consumptionPerMile * emissionFactor * 5).toFixed(2);
+        emissionsPerYearLbs = (milesNum * consumptionPerMile * emissionFactor * 5 * 52).toFixed(2);
+      } else if (vehicleType === 'Motorcycle') {
+        // For Motorcycle:
+        //   - Use the motorcycle's MPG from the vehicleData (default assumed to be 40 MPG)
+        //   - Calculate gallons used = miles / MPG
+        //   - Multiply by 19.6 lbs CO₂ per gallon (assumed for gasoline)
+        const mpgNum = parseFloat(mpg);
+        const gallonsUsed = milesNum / mpgNum;
+        emissionsPerDayLbs = (gallonsUsed * 19.6).toFixed(2);
+        emissionsPerWeekLbs = (gallonsUsed * 19.6 * 5).toFixed(2);
+        emissionsPerYearLbs = (gallonsUsed * 19.6 * 5 * 52).toFixed(2);
+      } else {
+        // Default calculation for other vehicle types (Small Car, Hybrid Car, Large Car, SUV, Truck):
+        //   - Calculate gallons used: miles / mpg
+        //   - Multiply by 19.6 lbs CO₂ per gallon (EPA factor)
+        const mpgNum = parseFloat(mpg);
+        const gallonsUsed = milesNum / mpgNum;
+        emissionsPerDayLbs = (gallonsUsed * 19.6).toFixed(2);
+        emissionsPerWeekLbs = (gallonsUsed * 19.6 * 5).toFixed(2);
+        emissionsPerYearLbs = (gallonsUsed * 19.6 * 5 * 52).toFixed(2);
+      }
 
       setEmissions(emissionsPerDayLbs);
       const calculationTime = new Date();
@@ -482,7 +534,7 @@ export default function HomeScreen() {
         id: calculationTime.getTime().toString(),
         date: calculationTime.toISOString(),
         miles: currentMiles,
-        mpg,
+        mpg, // For E-bike, mpg is not used.
         emissionsPerDay: emissionsPerDayLbs,
         emissionsPerWeek: emissionsPerWeekLbs,
         emissionsPerYear: emissionsPerYearLbs,
@@ -510,7 +562,7 @@ export default function HomeScreen() {
     <ScrollView contentContainerStyle={styles.scrollContainer}>
       <ThemedView style={styles.container}>
         <ThemedText type="title" style={styles.title}>
-          Car Commute Calculator
+          Carbon Commute Calculator
         </ThemedText>
         <ThemedText style={styles.description}>
           Calculate your carbon footprint by entering your trip details below.
@@ -518,9 +570,7 @@ export default function HomeScreen() {
 
         {/* Distance Input */}
         <View style={styles.inputGroup}>
-          <ThemedText style={styles.label}>
-            Distance Traveled Per Day (Miles)
-          </ThemedText>
+          <ThemedText style={styles.label}>Distance Traveled Per Day (Miles)</ThemedText>
           <View style={styles.inputRow}>
             <TextInput
               style={[styles.input, { flex: 1 }]}
@@ -599,34 +649,36 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* Fuel Efficiency */}
-        <View style={styles.sectionContainer}>
-          <ThemedText style={styles.sectionTitle}>Fuel Efficiency</ThemedText>
-          <View style={styles.efficiencyContainer}>
-            <View style={styles.defaultMpgBox}>
-              <ThemedText style={styles.defaultMpgLabel}>
-                Default MPG for {vehicleType}:
-              </ThemedText>
-              <ThemedText style={styles.defaultMpgValue}>
-                {vehicleData[vehicleType].mpg} MPG
-              </ThemedText>
-            </View>
-            <View style={styles.customMpgContainer}>
-              <ThemedText style={styles.label}>Custom MPG (Optional)</ThemedText>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter your exact MPG"
-                keyboardType="numeric"
-                value={mpg}
-                onChangeText={setMpg}
-                placeholderTextColor={colors[theme].textSecondary}
-              />
-              <ThemedText style={styles.helperText}>
-                Only enter if you know your vehicle's exact fuel efficiency.
-              </ThemedText>
+        {/* Fuel Efficiency (for non-E-bike vehicles) */}
+        {vehicleType !== 'E-bike' && (
+          <View style={styles.sectionContainer}>
+            <ThemedText style={styles.sectionTitle}>Fuel Efficiency</ThemedText>
+            <View style={styles.efficiencyContainer}>
+              <View style={styles.defaultMpgBox}>
+                <ThemedText style={styles.defaultMpgLabel}>
+                  Default MPG for {vehicleType}:
+                </ThemedText>
+                <ThemedText style={styles.defaultMpgValue}>
+                  {vehicleData[vehicleType].mpg} MPG
+                </ThemedText>
+              </View>
+              <View style={styles.customMpgContainer}>
+                <ThemedText style={styles.label}>Custom MPG (Optional)</ThemedText>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter your exact MPG"
+                  keyboardType="numeric"
+                  value={mpg}
+                  onChangeText={setMpg}
+                  placeholderTextColor={colors[theme].textSecondary}
+                />
+                <ThemedText style={styles.helperText}>
+                  Only enter if you know your vehicle's exact fuel efficiency.
+                </ThemedText>
+              </View>
             </View>
           </View>
-        </View>
+        )}
 
         {/* Calculation Button */}
         <TouchableOpacity
@@ -646,58 +698,40 @@ export default function HomeScreen() {
           <View style={styles.resultsContainer}>
             <ThemedText style={styles.emissionsResult}>
               Estimated CO₂ Emissions (Per Day):{' '}
-              <ThemedText style={styles.emissionsNumber}>
-                {formatNumber(emissions)} lbs
-              </ThemedText>
+              <ThemedText style={styles.emissionsNumber}>{formatNumber(emissions)} lbs</ThemedText>
             </ThemedText>
             <ThemedText style={styles.emissionsResult}>
               Estimated Weekly CO₂ Emissions (5 days per week):{'\n'}
-              <ThemedText style={styles.emissionsNumber}>
-                {formatNumber(weeklyEmissions)} lbs
-              </ThemedText>
+              <ThemedText style={styles.emissionsNumber}>{formatNumber(weeklyEmissions)} lbs</ThemedText>
             </ThemedText>
             <ThemedText style={styles.emissionsResult}>
               Estimated Yearly CO₂ Emissions:{'\n'}
-              <ThemedText style={styles.emissionsNumber}>
-                {formatNumber(yearlyEmissions)} lbs
-              </ThemedText>
+              <ThemedText style={styles.emissionsNumber}>{formatNumber(yearlyEmissions)} lbs</ThemedText>
             </ThemedText>
 
             {/* Carbon Credits */}
             <View style={styles.carbonCreditContainer}>
-              <ThemedText style={styles.carbonCreditTitle}>
-                Carbon Credit Equivalent
-              </ThemedText>
+              <ThemedText style={styles.carbonCreditTitle}>Carbon Credit Equivalent</ThemedText>
               <ThemedText style={styles.carbonCreditText}>
                 One carbon credit is equivalent to 2,204.62 lbs (1 metric ton) of CO₂.
               </ThemedText>
               <ThemedText style={styles.carbonCreditText}>
                 Your estimated yearly trip emissions of{' '}
-                <ThemedText style={styles.emissionsNumber}>
-                  {formatNumber(yearlyEmissions)} lbs
-                </ThemedText>{' '}
+                <ThemedText style={styles.emissionsNumber}>{formatNumber(yearlyEmissions)} lbs</ThemedText>{' '}
                 represent{' '}
-                <ThemedText style={styles.emissionsNumber}>
-                  {formatNumber(yearlyCarbonCredits)}
-                </ThemedText>{' '}
+                <ThemedText style={styles.emissionsNumber}>{formatNumber(yearlyCarbonCredits)}</ThemedText>{' '}
                 carbon credits.
               </ThemedText>
             </View>
 
             {/* Urban Trees Equivalent */}
             <View style={styles.urbanTreesContainer}>
-              <ThemedText style={styles.urbanTreesTitle}>
-                Urban Trees Equivalent
-              </ThemedText>
+              <ThemedText style={styles.urbanTreesTitle}>Urban Trees Equivalent</ThemedText>
               <ThemedText style={styles.urbanTreesText}>
                 Your estimated yearly trip emissions of{' '}
-                <ThemedText style={styles.emissionsNumber}>
-                  {formatNumber(yearlyEmissions)} lbs
-                </ThemedText>{' '}
+                <ThemedText style={styles.emissionsNumber}>{formatNumber(yearlyEmissions)} lbs</ThemedText>{' '}
                 offset approximately{' '}
-                <ThemedText style={styles.emissionsNumber}>
-                  {formatNumber(urbanTrees)}
-                </ThemedText>{' '}
+                <ThemedText style={styles.emissionsNumber}>{formatNumber(urbanTrees)}</ThemedText>{' '}
                 urban trees.
               </ThemedText>
               <ThemedText style={styles.urbanTreesText}>
@@ -716,9 +750,7 @@ export default function HomeScreen() {
               </ThemedText>
             </TouchableOpacity>
 
-            <ThemedText style={styles.impactText}>
-              {getEmissionsImpact(dailyEmissions)}
-            </ThemedText>
+            <ThemedText style={styles.impactText}>{getEmissionsImpact(dailyEmissions)}</ThemedText>
 
             {lastCalculation && (
               <ThemedText style={styles.timestamp}>
