@@ -8,10 +8,9 @@
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    "privacy":"https://eric-christine.medium.com/privacy-policy-for-carbon-commute-emissions-calculator-2d3066bde7af",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.ericchristine.CarEmissionsTracker",
+      "bundleIdentifier": "org.name.CarEmissionsTracker",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
