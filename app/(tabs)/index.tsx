@@ -569,8 +569,9 @@ export default function HomeScreen() {
         </ThemedText>
 
         {/* Distance Input */}
+        <View style={styles.sectionContainer}>
         <View style={styles.inputGroup}>
-          <ThemedText style={styles.label}>Distance Traveled Per Day (Miles)</ThemedText>
+          <ThemedText style={styles.sectionTitle}>Distance Traveled Per Day (Miles)</ThemedText>
           <View style={styles.inputRow}>
             <TextInput
               style={[styles.input, { flex: 1 }]}
@@ -585,7 +586,7 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </View>
         </View>
-
+      </View>
         {/* Vehicle Information */}
         <View style={styles.sectionContainer}>
           <ThemedText style={styles.sectionTitle}>Vehicle Information</ThemedText>

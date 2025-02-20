@@ -1,4 +1,4 @@
-package com.caremissionstracker
+package com.ericchristine.CarEmissionsTracker
 
 import android.app.Application
 import android.content.res.Configuration

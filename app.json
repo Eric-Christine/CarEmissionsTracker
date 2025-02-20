@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "CarEmissionsTracker",
-    "slug": "CarEmissionsTracker",
+    "name": "Carbon Commute",
+    "slug": "Carbon-Commute",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/CarbonCalculator.png",
@@ -10,7 +10,7 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "org.name.CarEmissionsTracker",
+      "bundleIdentifier": "com.ericchristine.CarEmissionsTracker",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -19,7 +19,8 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "package": "com.ericchristine.CarEmissionsTracker"
     },
     "web": {
       "bundler": "metro",
