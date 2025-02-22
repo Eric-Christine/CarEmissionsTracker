@@ -335,6 +335,7 @@
 					"FB_SONARKIT_ENABLED=1",
 				);
 				INFOPLIST_FILE = CarEmissionsTracker/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = CarbonCommute;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -347,7 +348,7 @@
 					"-lc++",
 				);
 				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_DEBUG";
-				PRODUCT_BUNDLE_IDENTIFIER = org.name.CarbonCommute;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ericchristine.CarbonCommute;
 				PRODUCT_NAME = CarbonCommute;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
@@ -366,6 +367,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = N2FGB43562;
 				INFOPLIST_FILE = CarEmissionsTracker/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = CarbonCommute;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -378,7 +380,7 @@
 					"-lc++",
 				);
 				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_RELEASE";
-				PRODUCT_BUNDLE_IDENTIFIER = org.name.CarbonCommute;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ericchristine.CarbonCommute;
 				PRODUCT_NAME = CarbonCommute;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
