@@ -20,7 +20,7 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.ericchristine.CarEmissionsTracker"
+      "package": "com.ericchristine.CarbonCummute"
     },
     "web": {
       "bundler": "metro",
@@ -47,7 +47,7 @@
         "origin": false
       },
       "eas": {
-        "projectId": "74cf9ee2-cf2b-4935-9069-bc38c556d789"
+        "projectId": "e14b3bf5-f76a-43ef-b38f-ef7e9685fd16"
       }
     },
     "owner": "eric-christine"

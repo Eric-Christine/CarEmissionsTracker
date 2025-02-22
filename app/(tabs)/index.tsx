@@ -434,6 +434,7 @@ export default function HomeScreen() {
   // Detect system color scheme
   const colorScheme = useColorScheme();
   const theme = colorScheme === 'dark' ? 'dark' : 'light';
+  
   const styles = createThemedStyles(theme);
 
   // Define the default vehicle type
