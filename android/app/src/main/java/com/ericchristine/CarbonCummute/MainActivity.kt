@@ -1,4 +1,4 @@
-package com.ericchristine.CarEmissionsTracker
+package com.ericchristine.CarbonCummute
 import expo.modules.splashscreen.SplashScreenManager
 
 import android.os.Build

@@ -86,9 +86,9 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace "com.caremissionstracker"
+    namespace 'com.ericchristine.CarbonCummute'
     defaultConfig {
-        applicationId 'com.ericchristine.CarEmissionsTracker'
+        applicationId 'com.ericchristine.CarbonCummute'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

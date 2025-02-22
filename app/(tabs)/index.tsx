@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   StyleSheet,
   TextInput,
@@ -10,6 +10,8 @@ import {
   Modal,
   FlatList,
   ScrollView,
+  KeyboardAvoidingView,
+  Platform,
   Linking,
   useColorScheme,
 } from 'react-native';
@@ -436,6 +438,7 @@ export default function HomeScreen() {
   const theme = colorScheme === 'dark' ? 'dark' : 'light';
   
   const styles = createThemedStyles(theme);
+  const scrollViewRef = useRef<ScrollView>(null);
 
   // Define the default vehicle type
   const defaultVehicleType = 'Small Car';
@@ -479,11 +482,10 @@ export default function HomeScreen() {
     );
   };
 
-  // New function: automatically convert the entered distance when switching measurement systems.
+  // Automatically convert the entered distance when switching measurement systems.
   const handleToggleMeasurement = () => {
     const distanceValue = parseFloat(miles);
     if (!isNaN(distanceValue)) {
-      // If currently Imperial, convert miles to kilometers; otherwise convert km to miles.
       const converted =
         isMetric
           ? distanceValue / 1.60934  // switching from Metric (KM) to Imperial (Miles)
@@ -528,12 +530,8 @@ export default function HomeScreen() {
   const calculateEmissions = (bypassValidation: boolean = false): void => {
     if (!bypassValidation && !validateInputs()) return;
 
-    // Convert the entered distance based on the measurement system.
     const inputDistance = parseFloat(miles);
-    // If metric, convert kilometers to miles (1 mile ≈ 1.60934 km)
     const milesNum = isMetric ? inputDistance / 1.60934 : inputDistance;
-
-    // Capture the current distance input for record keeping.
     const currentMiles = miles;
     setIsCalculating(true);
     Keyboard.dismiss();
@@ -542,16 +540,11 @@ export default function HomeScreen() {
       let emissionsPerDay: string, emissionsPerWeek: string, emissionsPerYear: string;
 
       if (vehicleType === 'Bus') {
-        // For Bus:
-        //   - Fuel emission factor: 22.45 lbs CO₂ per gallon
-        //   - Fuel efficiency: 6 MPG (fixed)
-        //   - Emissions per mile = 22.45 / 6 ≈ 3.74 lbs/mile; per-person = 3.74 / 15
         const perMilePerPerson = 22.45 / 6 / 15;
         let day = milesNum * perMilePerPerson;
         let week = day * 5;
         let year = day * 5 * 52;
         if (isMetric) {
-          // Convert lbs to kg (1 lb ≈ 0.453592 kg)
           day *= 0.453592;
           week *= 0.453592;
           year *= 0.453592;
@@ -560,9 +553,6 @@ export default function HomeScreen() {
         emissionsPerWeek = week.toFixed(2);
         emissionsPerYear = year.toFixed(2);
       } else if (vehicleType === 'E-bike') {
-        // For E-bike:
-        //   - Average consumption: 0.04 kWh per mile
-        //   - Emission factor: 0.92 lbs CO₂ per kWh
         let day = milesNum * 0.04 * 0.92;
         let week = day * 5;
         let year = day * 5 * 52;
@@ -575,10 +565,7 @@ export default function HomeScreen() {
         emissionsPerWeek = week.toFixed(2);
         emissionsPerYear = year.toFixed(2);
       } else if (vehicleType === 'Motorcycle') {
-        // For Motorcycle:
-        //   - Use custom fuel efficiency input.
         const feNum = parseFloat(fuelEfficiency);
-        // Convert L/100 km to MPG if needed.
         const mpgValue = !isMetric ? feNum : 235.214 / feNum;
         const gallonsUsed = milesNum / mpgValue;
         let day = gallonsUsed * 19.6;
@@ -593,7 +580,6 @@ export default function HomeScreen() {
         emissionsPerWeek = week.toFixed(2);
         emissionsPerYear = year.toFixed(2);
       } else {
-        // Default calculation for other vehicle types:
         const feNum = parseFloat(fuelEfficiency);
         const mpgValue = !isMetric ? feNum : 235.214 / feNum;
         const gallonsUsed = milesNum / mpgValue;
@@ -615,7 +601,6 @@ export default function HomeScreen() {
       setLastCalculation(calculationTime);
       setIsCalculating(false);
 
-      // Create a record with emissions values in lbs or kg and fuel efficiency in the chosen unit.
       const record: CalculationRecord = {
         id: calculationTime.getTime().toString(),
         date: calculationTime.toISOString(),
@@ -637,267 +622,274 @@ export default function HomeScreen() {
     return 'High environmental impact - Consider carpooling or alternative transport';
   };
 
-  // Derived values for display.
-  // Note: For metric, emissions are in kg; for imperial, in lbs.
   const dailyEmissions = emissions ? parseFloat(emissions) : 0;
   const weeklyEmissions = emissions ? (dailyEmissions * 5).toFixed(0) : null;
   const yearlyEmissions = emissions ? (dailyEmissions * 5 * 52).toFixed(0) : null;
-  // Carbon credits: 2204.62 lbs ≈ 1 metric ton (Imperial) or 1000 kg (Metric)
   const yearlyCarbonCredits = emissions
     ? (dailyEmissions * 5 * 52 / (isMetric ? 1000 : 2204.62)).toFixed(2)
     : null;
-  // Urban trees: 86.17 lbs offset per tree (Imperial) or ~39.14 kg per tree (Metric)
   const urbanTrees = yearlyEmissions
     ? (parseFloat(yearlyEmissions) / (isMetric ? 39.14 : 86.17)).toFixed(0)
     : null;
 
   return (
-    <ScrollView contentContainerStyle={styles.scrollContainer}>
-      <ThemedView style={styles.container}>
-        <ThemedText type="title" style={styles.title}>
-          Carbon Commute Calculator
-        </ThemedText>
-        <ThemedText style={styles.description}>
-          Calculate your carbon footprint by entering your trip details below.
-        </ThemedText>
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+      <ScrollView ref={scrollViewRef} contentContainerStyle={styles.scrollContainer}>
+        <ThemedView style={styles.container}>
+          <ThemedText type="title" style={styles.title}>
+            Carbon Commute Calculator
+          </ThemedText>
+          <ThemedText style={styles.description}>
+            Calculate your carbon footprint by entering your trip details below.
+          </ThemedText>
 
-        {/* Measurement Toggle */}
-        <View style={styles.toggleContainer}>
-          <TouchableOpacity
-            style={styles.toggleButton}
-            onPress={handleToggleMeasurement}
-          >
-            <ThemedText style={styles.toggleButtonText}>
-              {isMetric ? 'Switch to Imperial (Miles, lbs)' : 'Switch to Metric (KM, kg)'}
-            </ThemedText>
-          </TouchableOpacity>
-        </View>
-
-        {/* Distance Input */}
-        <View style={styles.sectionContainer}>
-          <View style={styles.inputGroup}>
-            <ThemedText style={styles.sectionTitle}>
-              Distance Traveled Per Day ({isMetric ? 'KM' : 'Miles'})
-            </ThemedText>
-            <View style={styles.inputRow}>
-              <TextInput
-                style={[styles.input, { flex: 1 }]}
-                placeholder={
-                  isMetric ? 'Enter kilometers traveled' : 'Enter miles driven'
-                }
-                keyboardType="numeric"
-                value={miles}
-                onChangeText={setMiles}
-                placeholderTextColor={colors[theme].textSecondary}
-              />
-              <TouchableOpacity style={styles.okButton} onPress={() => Keyboard.dismiss()}>
-                <ThemedText style={styles.okButtonText}>OK</ThemedText>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-
-        {/* Vehicle Information */}
-        <View style={styles.sectionContainer}>
-          <ThemedText style={styles.sectionTitle}>Vehicle Information</ThemedText>
-          <View style={styles.inputGroup}>
-            <ThemedText style={styles.label}>Select Vehicle Type</ThemedText>
-            <TouchableOpacity style={styles.dropdownButton} onPress={() => setIsDropdownOpen(true)}>
-              <ThemedText style={styles.dropdownButtonText}>{vehicleType}</ThemedText>
-              <ThemedText style={styles.dropdownIcon}>▼</ThemedText>
-            </TouchableOpacity>
-
-            <Modal
-              visible={isDropdownOpen}
-              transparent={true}
-              animationType="fade"
-              onRequestClose={() => setIsDropdownOpen(false)}
+          {/* Measurement Toggle */}
+          <View style={styles.toggleContainer}>
+            <TouchableOpacity
+              style={styles.toggleButton}
+              onPress={handleToggleMeasurement}
             >
-              <TouchableOpacity
-                style={styles.modalOverlay}
-                activeOpacity={1}
-                onPress={() => setIsDropdownOpen(false)}
-              >
-                <View style={styles.dropdownContainer}>
-                  <View style={styles.dropdownHeader}>
-                    <ThemedText style={styles.dropdownTitle}>Select Vehicle Type</ThemedText>
-                    <TouchableOpacity onPress={() => setIsDropdownOpen(false)}>
-                      <ThemedText style={styles.closeButton}>✕</ThemedText>
-                    </TouchableOpacity>
-                  </View>
-                  <FlatList
-                    data={Object.values(vehicleData)}
-                    keyExtractor={(item) => item.type}
-                    renderItem={({ item }) => (
-                      <TouchableOpacity
-                        style={[
-                          styles.dropdownItem,
-                          vehicleType === item.type && styles.dropdownItemSelected,
-                        ]}
-                        onPress={() => {
-                          handleVehicleTypeChange(item.type);
-                          setIsDropdownOpen(false);
-                        }}
-                      >
-                        <View>
-                          <ThemedText style={styles.dropdownItemText}>{item.type}</ThemedText>
-                          <ThemedText style={styles.dropdownItemDescription}>
-                            {item.description}
-                          </ThemedText>
-                        </View>
-                        {vehicleType === item.type && (
-                          <ThemedText style={styles.selectedCheck}>✓</ThemedText>
-                        )}
-                      </TouchableOpacity>
-                    )}
-                  />
-                </View>
-              </TouchableOpacity>
-            </Modal>
-            <ThemedText style={styles.helperText}>
-              {vehicleData[vehicleType].description}
-            </ThemedText>
+              <ThemedText style={styles.toggleButtonText}>
+                {isMetric ? 'Switch to Imperial (Miles, lbs)' : 'Switch to Metric (KM, kg)'}
+              </ThemedText>
+            </TouchableOpacity>
           </View>
-        </View>
 
-        {/* Fuel Efficiency Section (for non-E-bike vehicles) */}
-        {vehicleType !== 'E-bike' && (
+          {/* Distance Input */}
           <View style={styles.sectionContainer}>
-            <ThemedText style={styles.sectionTitle}>Fuel Efficiency</ThemedText>
-            <View style={styles.efficiencyContainer}>
-              <View style={styles.defaultFuelBox}>
-                <ThemedText style={styles.defaultFuelLabel}>
-                  {isMetric
-                    ? `Default Fuel Consumption for ${vehicleType}:`
-                    : `Default MPG for ${vehicleType}:`}
-                </ThemedText>
-                <ThemedText style={styles.defaultFuelValue}>
-                  {isMetric
-                    ? (235.214 / vehicleData[vehicleType].mpg).toFixed(2) + ' L/100 km'
-                    : vehicleData[vehicleType].mpg + ' MPG'}
-                </ThemedText>
-              </View>
-              <View style={styles.customFuelContainer}>
-                <ThemedText style={styles.label}>
-                  {isMetric ? 'Custom L/100 km (Optional)' : 'Custom MPG (Optional)'}
-                </ThemedText>
+            <View style={styles.inputGroup}>
+              <ThemedText style={styles.sectionTitle}>
+                Distance Traveled Per Day ({isMetric ? 'KM' : 'Miles'})
+              </ThemedText>
+              <View style={styles.inputRow}>
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, { flex: 1 }]}
                   placeholder={
-                    isMetric
-                      ? 'Enter your exact fuel consumption in L/100 km'
-                      : 'Enter your exact MPG'
+                    isMetric ? 'Enter kilometers traveled' : 'Enter miles driven'
                   }
                   keyboardType="numeric"
-                  value={fuelEfficiency}
-                  onChangeText={setFuelEfficiency}
+                  value={miles}
+                  onChangeText={setMiles}
                   placeholderTextColor={colors[theme].textSecondary}
                 />
-                <ThemedText style={styles.helperText}>
-                  Only enter if you know your vehicle's exact fuel efficiency.
-                </ThemedText>
+                <TouchableOpacity style={styles.okButton} onPress={() => Keyboard.dismiss()}>
+                  <ThemedText style={styles.okButtonText}>OK</ThemedText>
+                </TouchableOpacity>
               </View>
             </View>
           </View>
-        )}
 
-        {/* Calculation Button */}
-        <TouchableOpacity
-          style={styles.calculateButton}
-          onPress={() => calculateEmissions()}
-          disabled={isCalculating}
-        >
-          {isCalculating ? (
-            <ActivityIndicator color={theme === 'dark' ? '#000' : '#fff'} />
-          ) : (
-            <ThemedText style={styles.buttonText}>Calculate CO₂ Emissions</ThemedText>
-          )}
-        </TouchableOpacity>
+          {/* Vehicle Information */}
+          <View style={styles.sectionContainer}>
+            <ThemedText style={styles.sectionTitle}>Vehicle Information</ThemedText>
+            <View style={styles.inputGroup}>
+              <ThemedText style={styles.label}>Select Vehicle Type</ThemedText>
+              <TouchableOpacity style={styles.dropdownButton} onPress={() => setIsDropdownOpen(true)}>
+                <ThemedText style={styles.dropdownButtonText}>{vehicleType}</ThemedText>
+                <ThemedText style={styles.dropdownIcon}>▼</ThemedText>
+              </TouchableOpacity>
 
-        {/* Display Results */}
-        {emissions !== null && (
-          <View style={styles.resultsContainer}>
-            <ThemedText style={styles.emissionsResult}>
-              Estimated CO₂ Emissions (Per Day):{' '}
-              <ThemedText style={styles.emissionsNumber}>
-                {formatNumber(emissions)} {isMetric ? 'kg' : 'lbs'}
-              </ThemedText>
-            </ThemedText>
-            <ThemedText style={styles.emissionsResult}>
-              Estimated Weekly CO₂ Emissions (5 days per week):{'\n'}
-              <ThemedText style={styles.emissionsNumber}>
-                {formatNumber(weeklyEmissions)} {isMetric ? 'kg' : 'lbs'}
-              </ThemedText>
-            </ThemedText>
-            <ThemedText style={styles.emissionsResult}>
-              Estimated Yearly CO₂ Emissions:{'\n'}
-              <ThemedText style={styles.emissionsNumber}>
-                {formatNumber(yearlyEmissions)} {isMetric ? 'kg' : 'lbs'}
-              </ThemedText>
-            </ThemedText>
-
-            {/* Carbon Credits */}
-            <View style={styles.carbonCreditContainer}>
-              <ThemedText style={styles.carbonCreditTitle}>Carbon Credit Equivalent</ThemedText>
-              <ThemedText style={styles.carbonCreditText}>
-                {isMetric
-                  ? 'One carbon credit is equivalent to 1,000 kg (1 metric ton) of CO₂.'
-                  : 'One carbon credit is equivalent to 2,204.62 lbs (1 metric ton) of CO₂.'}
-              </ThemedText>
-              <ThemedText style={styles.carbonCreditText}>
-                Your estimated yearly trip emissions of{' '}
-                <ThemedText style={styles.emissionsNumber}>
-                  {formatNumber(yearlyEmissions)} {isMetric ? 'kg' : 'lbs'}
-                </ThemedText>{' '}
-                represent{' '}
-                <ThemedText style={styles.emissionsNumber}>
-                  {formatNumber(yearlyCarbonCredits)}
-                </ThemedText>{' '}
-                carbon credits.
+              <Modal
+                visible={isDropdownOpen}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={() => setIsDropdownOpen(false)}
+              >
+                <TouchableOpacity
+                  style={styles.modalOverlay}
+                  activeOpacity={1}
+                  onPress={() => setIsDropdownOpen(false)}
+                >
+                  <View style={styles.dropdownContainer}>
+                    <View style={styles.dropdownHeader}>
+                      <ThemedText style={styles.dropdownTitle}>Select Vehicle Type</ThemedText>
+                      <TouchableOpacity onPress={() => setIsDropdownOpen(false)}>
+                        <ThemedText style={styles.closeButton}>✕</ThemedText>
+                      </TouchableOpacity>
+                    </View>
+                    <FlatList
+                      data={Object.values(vehicleData)}
+                      keyExtractor={(item) => item.type}
+                      renderItem={({ item }) => (
+                        <TouchableOpacity
+                          style={[
+                            styles.dropdownItem,
+                            vehicleType === item.type && styles.dropdownItemSelected,
+                          ]}
+                          onPress={() => {
+                            handleVehicleTypeChange(item.type);
+                            setIsDropdownOpen(false);
+                          }}
+                        >
+                          <View>
+                            <ThemedText style={styles.dropdownItemText}>{item.type}</ThemedText>
+                            <ThemedText style={styles.dropdownItemDescription}>
+                              {item.description}
+                            </ThemedText>
+                          </View>
+                          {vehicleType === item.type && (
+                            <ThemedText style={styles.selectedCheck}>✓</ThemedText>
+                          )}
+                        </TouchableOpacity>
+                      )}
+                    />
+                  </View>
+                </TouchableOpacity>
+              </Modal>
+              <ThemedText style={styles.helperText}>
+                {vehicleData[vehicleType].description}
               </ThemedText>
             </View>
-
-            {/* Urban Trees Equivalent */}
-            <View style={styles.urbanTreesContainer}>
-              <ThemedText style={styles.urbanTreesTitle}>Urban Trees Equivalent</ThemedText>
-              <ThemedText style={styles.urbanTreesText}>
-                Your estimated yearly trip emissions of{' '}
-                <ThemedText style={styles.emissionsNumber}>
-                  {formatNumber(yearlyEmissions)} {isMetric ? 'kg' : 'lbs'}
-                </ThemedText>{' '}
-                offset approximately{' '}
-                <ThemedText style={styles.emissionsNumber}>{formatNumber(urbanTrees)}</ThemedText>{' '}
-                urban trees.
-              </ThemedText>
-              <ThemedText style={styles.urbanTreesText}>
-                (Conversion: 1 urban tree offsets ~
-                {isMetric ? '39.14 kg' : '86.17 lbs'} of CO₂)
-              </ThemedText>
-            </View>
-
-            <TouchableOpacity
-              style={styles.offsetButton}
-              onPress={() =>
-                Linking.openURL('https://terrapass.com/product/productindividuals-families/')
-              }
-            >
-              <ThemedText style={styles.offsetButtonText}>
-                Purchase Carbon Credits to Offset Your Emissions
-              </ThemedText>
-            </TouchableOpacity>
-
-            <ThemedText style={styles.impactText}>
-              {getEmissionsImpact(dailyEmissions)}
-            </ThemedText>
-
-            {lastCalculation && (
-              <ThemedText style={styles.timestamp}>
-                Last calculated: {lastCalculation.toLocaleTimeString()}
-              </ThemedText>
-            )}
           </View>
-        )}
-      </ThemedView>
-    </ScrollView>
+
+          {/* Fuel Efficiency Section (for non-E-bike vehicles) */}
+          {vehicleType !== 'E-bike' && (
+            <View style={styles.sectionContainer}>
+              <ThemedText style={styles.sectionTitle}>Fuel Efficiency</ThemedText>
+              <View style={styles.efficiencyContainer}>
+                <View style={styles.defaultFuelBox}>
+                  <ThemedText style={styles.defaultFuelLabel}>
+                    {isMetric
+                      ? `Default Fuel Consumption for ${vehicleType}:`
+                      : `Default MPG for ${vehicleType}:`}
+                  </ThemedText>
+                  <ThemedText style={styles.defaultFuelValue}>
+                    {isMetric
+                      ? (235.214 / vehicleData[vehicleType].mpg).toFixed(2) + ' L/100 km'
+                      : vehicleData[vehicleType].mpg + ' MPG'}
+                  </ThemedText>
+                </View>
+                <View style={styles.customFuelContainer}>
+                  <ThemedText style={styles.label}>
+                    {isMetric ? 'Custom L/100 km (Optional)' : 'Custom MPG (Optional)'}
+                  </ThemedText>
+                  <TextInput
+                    style={styles.input}
+                    placeholder={
+                      isMetric
+                        ? 'Enter your exact fuel consumption in L/100 km'
+                        : 'Enter your exact MPG'
+                    }
+                    keyboardType="numeric"
+                    value={fuelEfficiency}
+                    onChangeText={setFuelEfficiency}
+                    placeholderTextColor={colors[theme].textSecondary}
+                    onFocus={() => {
+                      // Scroll to bottom when the input is focused
+                      setTimeout(() => {
+                        scrollViewRef.current?.scrollToEnd({ animated: true });
+                      }, 100);
+                    }}
+                  />
+                  <ThemedText style={styles.helperText}>
+                    Only enter if you know your vehicle's exact fuel efficiency.
+                  </ThemedText>
+                </View>
+              </View>
+            </View>
+          )}
+
+          {/* Calculation Button */}
+          <TouchableOpacity
+            style={styles.calculateButton}
+            onPress={() => calculateEmissions()}
+            disabled={isCalculating}
+          >
+            {isCalculating ? (
+              <ActivityIndicator color={theme === 'dark' ? '#000' : '#fff'} />
+            ) : (
+              <ThemedText style={styles.buttonText}>Calculate CO₂ Emissions</ThemedText>
+            )}
+          </TouchableOpacity>
+
+          {/* Display Results */}
+          {emissions !== null && (
+            <View style={styles.resultsContainer}>
+              <ThemedText style={styles.emissionsResult}>
+                Estimated CO₂ Emissions (Per Day):{' '}
+                <ThemedText style={styles.emissionsNumber}>
+                  {formatNumber(emissions)} {isMetric ? 'kg' : 'lbs'}
+                </ThemedText>
+              </ThemedText>
+              <ThemedText style={styles.emissionsResult}>
+                Estimated Weekly CO₂ Emissions (5 days per week):{'\n'}
+                <ThemedText style={styles.emissionsNumber}>
+                  {formatNumber(weeklyEmissions)} {isMetric ? 'kg' : 'lbs'}
+                </ThemedText>
+              </ThemedText>
+              <ThemedText style={styles.emissionsResult}>
+                Estimated Yearly CO₂ Emissions:{'\n'}
+                <ThemedText style={styles.emissionsNumber}>
+                  {formatNumber(yearlyEmissions)} {isMetric ? 'kg' : 'lbs'}
+                </ThemedText>
+              </ThemedText>
+
+              {/* Carbon Credits */}
+              <View style={styles.carbonCreditContainer}>
+                <ThemedText style={styles.carbonCreditTitle}>Carbon Credit Equivalent</ThemedText>
+                <ThemedText style={styles.carbonCreditText}>
+                  {isMetric
+                    ? 'One carbon credit is equivalent to 1,000 kg (1 metric ton) of CO₂.'
+                    : 'One carbon credit is equivalent to 2,204.62 lbs (1 metric ton) of CO₂.'}
+                </ThemedText>
+                <ThemedText style={styles.carbonCreditText}>
+                  Your estimated yearly trip emissions of{' '}
+                  <ThemedText style={styles.emissionsNumber}>
+                    {formatNumber(yearlyEmissions)} {isMetric ? 'kg' : 'lbs'}
+                  </ThemedText>{' '}
+                  represent{' '}
+                  <ThemedText style={styles.emissionsNumber}>
+                    {formatNumber(yearlyCarbonCredits)}
+                  </ThemedText>{' '}
+                  carbon credits.
+                </ThemedText>
+              </View>
+
+              {/* Urban Trees Equivalent */}
+              <View style={styles.urbanTreesContainer}>
+                <ThemedText style={styles.urbanTreesTitle}>Urban Trees Equivalent</ThemedText>
+                <ThemedText style={styles.urbanTreesText}>
+                  Your estimated yearly trip emissions of{' '}
+                  <ThemedText style={styles.emissionsNumber}>
+                    {formatNumber(yearlyEmissions)} {isMetric ? 'kg' : 'lbs'}
+                  </ThemedText>{' '}
+                  offset approximately{' '}
+                  <ThemedText style={styles.emissionsNumber}>{formatNumber(urbanTrees)}</ThemedText>{' '}
+                  urban trees.
+                </ThemedText>
+                <ThemedText style={styles.urbanTreesText}>
+                  (Conversion: 1 urban tree offsets ~
+                  {isMetric ? '39.14 kg' : '86.17 lbs'} of CO₂)
+                </ThemedText>
+              </View>
+
+              <TouchableOpacity
+                style={styles.offsetButton}
+                onPress={() =>
+                  Linking.openURL('https://terrapass.com/product/productindividuals-families/')
+                }
+              >
+                <ThemedText style={styles.offsetButtonText}>
+                  Purchase Carbon Credits to Offset Your Emissions
+                </ThemedText>
+              </TouchableOpacity>
+
+              <ThemedText style={styles.impactText}>
+                {getEmissionsImpact(dailyEmissions)}
+              </ThemedText>
+
+              {lastCalculation && (
+                <ThemedText style={styles.timestamp}>
+                  Last calculated: {lastCalculation.toLocaleTimeString()}
+                </ThemedText>
+              )}
+            </View>
+          )}
+        </ThemedView>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }

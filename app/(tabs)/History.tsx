@@ -116,21 +116,21 @@ export default function HistoryScreen() {
 
   // Render a single history record with unit conversion and carbon credits
   const renderItem = ({ item }: { item: CalculationRecord }) => {
-    // Convert values from stored Imperial units to Metric if toggled
+    // Convert values from stored Imperial units to Metric if toggled and add comma formatting.
     const displayMiles = isMetric
-      ? convertMilesToKm(Number(item.miles)).toFixed(2) + ' km'
+      ? formatNumber(convertMilesToKm(Number(item.miles)).toFixed(2)) + ' km'
       : formatNumber(item.miles) + ' miles';
     const displayFuel = isMetric
-      ? convertMPGToLper100Km(Number(item.fuelEfficiency)).toFixed(2) + ' L/100 km'
+      ? formatNumber(convertMPGToLper100Km(Number(item.fuelEfficiency)).toFixed(2)) + ' L/100 km'
       : formatNumber(item.fuelEfficiency) + ' MPG';
     const displayDay = isMetric
-      ? convertLbsToKg(Number(item.emissionsPerDay)).toFixed(2) + ' kg CO₂'
+      ? formatNumber(convertLbsToKg(Number(item.emissionsPerDay)).toFixed(2)) + ' kg CO₂'
       : formatNumber(item.emissionsPerDay) + ' lbs CO₂';
     const displayWeek = isMetric
-      ? convertLbsToKg(Number(item.emissionsPerWeek)).toFixed(2) + ' kg CO₂'
+      ? formatNumber(convertLbsToKg(Number(item.emissionsPerWeek)).toFixed(2)) + ' kg CO₂'
       : formatNumber(item.emissionsPerWeek) + ' lbs CO₂';
     const displayYear = isMetric
-      ? convertLbsToKg(Number(item.emissionsPerYear)).toFixed(2) + ' kg CO₂'
+      ? formatNumber(convertLbsToKg(Number(item.emissionsPerYear)).toFixed(2)) + ' kg CO₂'
       : formatNumber(item.emissionsPerYear) + ' lbs CO₂';
 
     // Calculate carbon credits to offset yearly emissions
@@ -185,8 +185,7 @@ export default function HistoryScreen() {
           }]}
           onPress={() => setIsMetric(!isMetric)}
         >
-          <ThemedText style={[styles.toggleButtonText, { color: colorScheme === 'dark' ? '#000' : '#fff'
- }]}>
+          <ThemedText style={[styles.toggleButtonText, { color: colorScheme === 'dark' ? '#000' : '#fff' }]}>
             {isMetric ? 'Switch to Imperial (Miles, lbs)' : 'Switch to Metric (KM, kg)'}
           </ThemedText>
         </TouchableOpacity>
