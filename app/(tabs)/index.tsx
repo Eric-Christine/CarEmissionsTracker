@@ -355,6 +355,7 @@ const createThemedStyles = (theme: 'light' | 'dark') =>
       backgroundColor: colors[theme].surface,
       borderRadius: 8,
       alignItems: 'flex-start',
+      width: '100%', // ensures the container uses full available width
     },
     emissionsResult: {
       fontSize: 18,
@@ -388,6 +389,7 @@ const createThemedStyles = (theme: 'light' | 'dark') =>
       backgroundColor: colors[theme].successLight,
       borderRadius: 8,
       alignItems: 'center',
+      width: '100%', // added for responsiveness
     },
     carbonCreditTitle: {
       fontSize: 18,
@@ -406,6 +408,7 @@ const createThemedStyles = (theme: 'light' | 'dark') =>
       backgroundColor: colors[theme].successLight,
       borderRadius: 8,
       alignItems: 'center',
+      width: '100%', // added for responsiveness
     },
     urbanTreesTitle: {
       fontSize: 18,
@@ -809,7 +812,7 @@ export default function HomeScreen() {
           {emissions !== null && (
             <View style={styles.resultsContainer}>
               <ThemedText style={styles.emissionsResult}>
-                Estimated CO₂ Emissions (Per Day):{' '}
+                Estimated CO₂ Emissions (Per Day):{'\n'}
                 <ThemedText style={styles.emissionsNumber}>
                   {formatNumber(emissions)} {isMetric ? 'kg' : 'lbs'}
                 </ThemedText>
