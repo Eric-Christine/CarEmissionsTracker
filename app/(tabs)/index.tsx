@@ -26,15 +26,15 @@ interface VehicleData {
   description: string;
 }
 
-// Updated CalculationRecord interface now stores emissions values in lbs or kg based on settings
+// CalculationRecord now stores numeric miles as a string, with no appended unit
 interface CalculationRecord {
-  id: string;             // Unique id (e.g., a timestamp string)
-  date: string;           // ISO string for the calculation date
-  miles: string;
-  fuelEfficiency: string; // Custom fuel efficiency: either MPG or L/100 km
-  emissionsPerDay: string;  // Emissions per day in lbs or kg
-  emissionsPerWeek: string; // Emissions per week in lbs or kg
-  emissionsPerYear: string; // Emissions per year in lbs or kg
+  id: string;
+  date: string;
+  miles: string;           // always in miles
+  fuelEfficiency: string;  // either MPG or L/100 km (stored as typed string)
+  emissionsPerDay: string; // always in lbs or kg based on user’s choice at calc time
+  emissionsPerWeek: string;
+  emissionsPerYear: string;
   vehicleType: string;
 }
 
@@ -56,7 +56,7 @@ const formatNumber = (value: string | number): string => {
   return isNaN(num) ? String(value) : num.toLocaleString('en-US');
 };
 
-// Define our available vehicle data, including Bus, E-bike, and Motorcycle as new options.
+// Define our available vehicle data
 const vehicleData: { [key: string]: VehicleData } = {
   'Small Car': {
     type: 'Small Car',
@@ -87,19 +87,19 @@ const vehicleData: { [key: string]: VehicleData } = {
     type: 'Bus',
     mpg: 6,
     description:
-      'Transit bus (e.g., typical diesel-powered bus, ~6 MPG). Emissions are calculated per person based on half occupancy (15 passengers).',
+      'Transit bus (~6 MPG). Emissions per person based on half occupancy (15 passengers).',
   },
   'E-bike': {
     type: 'E-bike',
-    mpg: 0, // Not applicable for electric bikes.
+    mpg: 0, // Not applicable for electric bikes
     description:
-      'Electric bike powered by electricity. Emissions are calculated based on an average consumption of 0.04 kWh per mile and an average emission factor of 0.92 lbs CO₂ per kWh.',
+      'Electric bike. Emissions based on ~0.04 kWh/mi and 0.92 lbs CO₂/kWh.',
   },
   'Motorcycle': {
     type: 'Motorcycle',
-    mpg: 40, // Typical motorcycle MPG; adjust as needed.
+    mpg: 40, // Typical motorcycle MPG
     description:
-      'Motorcycle (e.g., Harley Davidson, Yamaha). Generally more fuel efficient than cars. Emissions are calculated using gasoline consumption.',
+      'Motorcycle. Generally more fuel efficient than cars, but uses gasoline.',
   },
 };
 
@@ -355,7 +355,7 @@ const createThemedStyles = (theme: 'light' | 'dark') =>
       backgroundColor: colors[theme].surface,
       borderRadius: 8,
       alignItems: 'flex-start',
-      width: '100%', // ensures the container uses full available width
+      width: '100%',
     },
     emissionsResult: {
       fontSize: 18,
@@ -389,7 +389,7 @@ const createThemedStyles = (theme: 'light' | 'dark') =>
       backgroundColor: colors[theme].successLight,
       borderRadius: 8,
       alignItems: 'center',
-      width: '100%', // added for responsiveness
+      width: '100%',
     },
     carbonCreditTitle: {
       fontSize: 18,
@@ -408,7 +408,7 @@ const createThemedStyles = (theme: 'light' | 'dark') =>
       backgroundColor: colors[theme].successLight,
       borderRadius: 8,
       alignItems: 'center',
-      width: '100%', // added for responsiveness
+      width: '100%',
     },
     urbanTreesTitle: {
       fontSize: 18,
@@ -439,29 +439,48 @@ export default function HomeScreen() {
   // Detect system color scheme
   const colorScheme = useColorScheme();
   const theme = colorScheme === 'dark' ? 'dark' : 'light';
-  
   const styles = createThemedStyles(theme);
   const scrollViewRef = useRef<ScrollView>(null);
 
-  // Define the default vehicle type
+  // Default vehicle
   const defaultVehicleType = 'Small Car';
 
-  // Global toggle: false = Imperial, true = Metric.
+  // Single global toggle: stored in AsyncStorage
   const [isMetric, setIsMetric] = useState<boolean>(false);
+
+  // Load isMetric from AsyncStorage on mount
+  useEffect(() => {
+    const loadIsMetric = async () => {
+      try {
+        const storedValue = await AsyncStorage.getItem('@is_metric');
+        if (storedValue !== null) {
+          setIsMetric(JSON.parse(storedValue));
+        }
+      } catch (error) {
+        console.error('Error loading isMetric preference:', error);
+      }
+    };
+    loadIsMetric();
+  }, []);
+
+  // Distance input
   const [miles, setMiles] = useState<string>('27');
   const [vehicleType, setVehicleType] = useState<string>(defaultVehicleType);
-  // fuelEfficiency state now represents MPG if Imperial, or L/100 km if Metric.
+
+  // Fuel efficiency: MPG if Imperial, L/100 km if Metric
   const [fuelEfficiency, setFuelEfficiency] = useState<string>(
     isMetric
       ? (235.214 / vehicleData[defaultVehicleType].mpg).toFixed(2)
       : String(vehicleData[defaultVehicleType].mpg)
   );
-  const [emissions, setEmissions] = useState<string | null>(null); // Daily emissions (in lbs or kg)
+
+  // Emissions results
+  const [emissions, setEmissions] = useState<string | null>(null); // daily
   const [isCalculating, setIsCalculating] = useState<boolean>(false);
   const [lastCalculation, setLastCalculation] = useState<Date | null>(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
 
-  // When measurement system or vehicle type changes, update fuel efficiency default value.
+  // Update fuel efficiency when isMetric or vehicleType changes
   useEffect(() => {
     setFuelEfficiency(
       isMetric
@@ -470,12 +489,34 @@ export default function HomeScreen() {
     );
   }, [isMetric, vehicleType]);
 
-  // Reset displayed emissions when inputs change
+  // Reset emissions if inputs change
   useEffect(() => {
     setEmissions(null);
   }, [miles, fuelEfficiency, vehicleType]);
 
-  // When the user selects a vehicle type, update both vehicleType and fuelEfficiency using the default value.
+  // Switch measurement system + convert distance
+  const handleToggleMeasurement = async () => {
+    const distanceValue = parseFloat(miles);
+    if (!isNaN(distanceValue)) {
+      // If we're currently metric, convert to miles
+      // If currently imperial, convert to km
+      const converted = isMetric
+        ? distanceValue / 1.60934
+        : distanceValue * 1.60934;
+      setMiles(converted.toFixed(2));
+    }
+    const newValue = !isMetric;
+    setIsMetric(newValue);
+
+    // Save preference in AsyncStorage
+    try {
+      await AsyncStorage.setItem('@is_metric', JSON.stringify(newValue));
+    } catch (error) {
+      console.error('Error saving isMetric preference:', error);
+    }
+  };
+
+  // Select vehicle
   const handleVehicleTypeChange = (selectedType: string) => {
     setVehicleType(selectedType);
     setFuelEfficiency(
@@ -485,23 +526,11 @@ export default function HomeScreen() {
     );
   };
 
-  // Automatically convert the entered distance when switching measurement systems.
-  const handleToggleMeasurement = () => {
-    const distanceValue = parseFloat(miles);
-    if (!isNaN(distanceValue)) {
-      const converted =
-        isMetric
-          ? distanceValue / 1.60934  // switching from Metric (KM) to Imperial (Miles)
-          : distanceValue * 1.60934; // switching from Imperial (Miles) to Metric (KM)
-      setMiles(converted.toFixed(2));
-    }
-    setIsMetric(!isMetric);
-  };
-
+  // Validate inputs
   const validateInputs = (): boolean => {
     const distanceValue = parseFloat(miles);
     if (isNaN(distanceValue) || distanceValue <= 0) {
-      Alert.alert('Invalid Distance', 'Please enter a valid distance greater than 0.');
+      Alert.alert('Invalid Distance', 'Please enter a valid distance > 0.');
       return false;
     }
     if (vehicleType !== 'E-bike') {
@@ -510,8 +539,8 @@ export default function HomeScreen() {
         Alert.alert(
           isMetric ? 'Invalid Fuel Consumption' : 'Invalid MPG',
           isMetric
-            ? 'Please enter a valid fuel consumption value in L/100 km greater than 0.'
-            : 'Please enter a valid MPG value greater than 0.'
+            ? 'Please enter a valid fuel consumption in L/100 km > 0.'
+            : 'Please enter a valid MPG > 0.'
         );
         return false;
       }
@@ -530,19 +559,24 @@ export default function HomeScreen() {
     return true;
   };
 
+  // Calculate Emissions
   const calculateEmissions = (bypassValidation: boolean = false): void => {
     if (!bypassValidation && !validateInputs()) return;
 
     const inputDistance = parseFloat(miles);
+    // Convert user-entered distance to "raw miles" internally
     const milesNum = isMetric ? inputDistance / 1.60934 : inputDistance;
-    const currentMiles = miles;
     setIsCalculating(true);
     Keyboard.dismiss();
 
     setTimeout(() => {
-      let emissionsPerDay: string, emissionsPerWeek: string, emissionsPerYear: string;
+      let emissionsPerDay: string;
+      let emissionsPerWeek: string;
+      let emissionsPerYear: string;
 
       if (vehicleType === 'Bus') {
+        // Approx. 22.45 lbs CO₂ per gallon, 6 MPG, 15 passengers
+        // perMilePerPerson = 22.45 / 6 / 15
         const perMilePerPerson = 22.45 / 6 / 15;
         let day = milesNum * perMilePerPerson;
         let week = day * 5;
@@ -556,6 +590,7 @@ export default function HomeScreen() {
         emissionsPerWeek = week.toFixed(2);
         emissionsPerYear = year.toFixed(2);
       } else if (vehicleType === 'E-bike') {
+        // ~0.04 kWh/mi, 0.92 lbs CO₂/kWh
         let day = milesNum * 0.04 * 0.92;
         let week = day * 5;
         let year = day * 5 * 52;
@@ -567,25 +602,13 @@ export default function HomeScreen() {
         emissionsPerDay = day.toFixed(2);
         emissionsPerWeek = week.toFixed(2);
         emissionsPerYear = year.toFixed(2);
-      } else if (vehicleType === 'Motorcycle') {
-        const feNum = parseFloat(fuelEfficiency);
-        const mpgValue = !isMetric ? feNum : 235.214 / feNum;
-        const gallonsUsed = milesNum / mpgValue;
-        let day = gallonsUsed * 19.6;
-        let week = day * 5;
-        let year = day * 5 * 52;
-        if (isMetric) {
-          day *= 0.453592;
-          week *= 0.453592;
-          year *= 0.453592;
-        }
-        emissionsPerDay = day.toFixed(2);
-        emissionsPerWeek = week.toFixed(2);
-        emissionsPerYear = year.toFixed(2);
       } else {
+        // For cars & motorcycles
         const feNum = parseFloat(fuelEfficiency);
+        // Convert L/100 km -> mpg if isMetric
         const mpgValue = !isMetric ? feNum : 235.214 / feNum;
         const gallonsUsed = milesNum / mpgValue;
+        // 1 gallon gas -> 19.6 lbs CO₂
         let day = gallonsUsed * 19.6;
         let week = day * 5;
         let year = day * 5 * 52;
@@ -604,10 +627,11 @@ export default function HomeScreen() {
       setLastCalculation(calculationTime);
       setIsCalculating(false);
 
+      // Store numeric miles in the record (no appended units)
       const record: CalculationRecord = {
         id: calculationTime.getTime().toString(),
         date: calculationTime.toISOString(),
-        miles: currentMiles,
+        miles: milesNum.toFixed(2), // always store miles
         fuelEfficiency,
         emissionsPerDay,
         emissionsPerWeek,
@@ -625,6 +649,7 @@ export default function HomeScreen() {
     return 'High environmental impact - Consider carpooling or alternative transport';
   };
 
+  // For displaying results
   const dailyEmissions = emissions ? parseFloat(emissions) : 0;
   const weeklyEmissions = emissions ? (dailyEmissions * 5).toFixed(0) : null;
   const yearlyEmissions = emissions ? (dailyEmissions * 5 * 52).toFixed(0) : null;
@@ -820,13 +845,13 @@ export default function HomeScreen() {
               <ThemedText style={styles.emissionsResult}>
                 Estimated Weekly CO₂ Emissions (5 days per week):{'\n'}
                 <ThemedText style={styles.emissionsNumber}>
-                  {formatNumber(weeklyEmissions)} {isMetric ? 'kg' : 'lbs'}
+                  {weeklyEmissions && formatNumber(weeklyEmissions)} {isMetric ? 'kg' : 'lbs'}
                 </ThemedText>
               </ThemedText>
               <ThemedText style={styles.emissionsResult}>
                 Estimated Yearly CO₂ Emissions:{'\n'}
                 <ThemedText style={styles.emissionsNumber}>
-                  {formatNumber(yearlyEmissions)} {isMetric ? 'kg' : 'lbs'}
+                  {yearlyEmissions && formatNumber(yearlyEmissions)} {isMetric ? 'kg' : 'lbs'}
                 </ThemedText>
               </ThemedText>
 
@@ -835,17 +860,17 @@ export default function HomeScreen() {
                 <ThemedText style={styles.carbonCreditTitle}>Carbon Credit Equivalent</ThemedText>
                 <ThemedText style={styles.carbonCreditText}>
                   {isMetric
-                    ? 'One carbon credit is equivalent to 1,000 kg (1 metric ton) of CO₂.'
-                    : 'One carbon credit is equivalent to 2,204.62 lbs (1 metric ton) of CO₂.'}
+                    ? 'One carbon credit = 1,000 kg (1 metric ton) of CO₂.'
+                    : 'One carbon credit = 2,204.62 lbs (1 metric ton) of CO₂.'}
                 </ThemedText>
                 <ThemedText style={styles.carbonCreditText}>
                   Your estimated yearly trip emissions of{' '}
                   <ThemedText style={styles.emissionsNumber}>
-                    {formatNumber(yearlyEmissions)} {isMetric ? 'kg' : 'lbs'}
+                    {yearlyEmissions && formatNumber(yearlyEmissions)} {isMetric ? 'kg' : 'lbs'}
                   </ThemedText>{' '}
                   represent{' '}
                   <ThemedText style={styles.emissionsNumber}>
-                    {formatNumber(yearlyCarbonCredits)}
+                    {yearlyCarbonCredits && formatNumber(yearlyCarbonCredits)}
                   </ThemedText>{' '}
                   carbon credits.
                 </ThemedText>
@@ -857,10 +882,12 @@ export default function HomeScreen() {
                 <ThemedText style={styles.urbanTreesText}>
                   Your estimated yearly trip emissions of{' '}
                   <ThemedText style={styles.emissionsNumber}>
-                    {formatNumber(yearlyEmissions)} {isMetric ? 'kg' : 'lbs'}
+                    {yearlyEmissions && formatNumber(yearlyEmissions)} {isMetric ? 'kg' : 'lbs'}
                   </ThemedText>{' '}
                   offset approximately{' '}
-                  <ThemedText style={styles.emissionsNumber}>{formatNumber(urbanTrees)}</ThemedText>{' '}
+                  <ThemedText style={styles.emissionsNumber}>
+                    {urbanTrees && formatNumber(urbanTrees)}
+                  </ThemedText>{' '}
                   urban trees.
                 </ThemedText>
                 <ThemedText style={styles.urbanTreesText}>
