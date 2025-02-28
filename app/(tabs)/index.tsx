@@ -108,6 +108,11 @@ const vehicleData: { [key: string]: VehicleData } = {
     description:
       'Subway/Metro rail. Highly efficient mass transit with ~0.17 kWh/passenger-mile.',
   },
+  'Electric Vehicle': {
+    type: 'Electric Vehicle',
+    mpg: 120, // MPGe for electric vehicles
+    description: 'Electric vehicle (e.g., Tesla Model 3, Nissan Leaf)',
+  },
 };
 
 // Theme colors
