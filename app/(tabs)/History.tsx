@@ -1,11 +1,11 @@
 import React, { useCallback, useState } from 'react';
-import { 
-  View, 
-  StyleSheet, 
-  FlatList, 
-  TouchableOpacity, 
+import {
+  View,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
   Alert,
-  useColorScheme 
+  useColorScheme,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ThemedText } from '@/components/ThemedText';
@@ -16,14 +16,16 @@ interface CalculationRecord {
   id: string;
   date: string;
   miles: string;           // always stored as numeric miles
-  fuelEfficiency: string;  // either MPG or L/100 km
-  emissionsPerDay: string; // stored in lbs or kg at calc time
+  fuelEfficiency: string;  // value as string, in MPG, L/100 km, or MPGe
+  fuelEfficiencyUnit: 'mpg' | 'l/100km' | 'mpge'; // unit at calculation time
+  emissionsPerDay: string; // value as string, in lbs or kg
   emissionsPerWeek: string;
   emissionsPerYear: string;
+  emissionsUnit: 'lbs' | 'kg'; // unit at calculation time
   vehicleType: string;
 }
 
-// Theme colors consistent with the app's theme
+// Theme colors
 const colors = {
   light: {
     background: '#fff',
@@ -46,30 +48,27 @@ const colors = {
     textLight: '#757575',
     border: '#404040',
     cardBackground: '#2c2c2c',
-  }
+  },
 };
 
-// Helper function to format numeric strings with commas
+// Helper functions
 const formatNumber = (value: string | number): string => {
   const num = typeof value === 'number' ? value : Number(value);
   return isNaN(num) ? String(value) : num.toLocaleString('en-US');
 };
 
-// Conversion helper functions (Imperial → Metric)
 const convertMilesToKm = (miles: number): number => miles * 1.60934;
 const convertMPGToLper100Km = (mpg: number): number => 235.214 / mpg;
 const convertLbsToKg = (lbs: number): number => lbs * 0.453592;
 
 export default function HistoryScreen() {
   const [history, setHistory] = useState<CalculationRecord[]>([]);
-  // Single global toggle, loaded from AsyncStorage
   const [isMetric, setIsMetric] = useState<boolean>(false);
 
   const colorScheme = useColorScheme();
   const theme = colorScheme === 'dark' ? 'dark' : 'light';
   const themeColors = colors[theme];
 
-  // Load both history and isMetric preference
   useFocusEffect(
     useCallback(() => {
       loadIsMetric();
@@ -88,13 +87,11 @@ export default function HistoryScreen() {
     }
   };
 
-  // Load calculation history from AsyncStorage
   const loadHistory = async () => {
     try {
       const jsonValue = await AsyncStorage.getItem('@calculation_history');
       if (jsonValue) {
         const parsedHistory: CalculationRecord[] = JSON.parse(jsonValue);
-        // Reverse so the most recent record is first
         setHistory(parsedHistory.reverse());
       } else {
         setHistory([]);
@@ -104,15 +101,14 @@ export default function HistoryScreen() {
     }
   };
 
-  // Clear history with confirmation
   const clearHistory = async () => {
     Alert.alert(
       'Clear History',
       'Are you sure you want to clear your calculation history?',
       [
         { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Clear', 
+        {
+          text: 'Clear',
           style: 'destructive',
           onPress: async () => {
             try {
@@ -121,13 +117,12 @@ export default function HistoryScreen() {
             } catch (error) {
               console.error('Failed to clear calculation history', error);
             }
-          } 
-        }
+          },
+        },
       ]
     );
   };
 
-  // Toggle measurement system from the History screen as well
   const handleToggleMeasurement = async () => {
     const newValue = !isMetric;
     setIsMetric(newValue);
@@ -138,68 +133,62 @@ export default function HistoryScreen() {
     }
   };
 
-  // Render a single history record
   const renderItem = ({ item }: { item: CalculationRecord }) => {
-    // 'miles' is stored as numeric miles
     const storedMiles = parseFloat(item.miles);
-
-    // Convert to user’s preferred system for display
     const displayDistance = isMetric
-      ? formatNumber(convertMilesToKm(storedMiles).toFixed(2)) + ' km'
-      : formatNumber(storedMiles.toFixed(2)) + ' miles';
+      ? `${formatNumber(convertMilesToKm(storedMiles).toFixed(2))} km`
+      : `${formatNumber(storedMiles.toFixed(2))} miles`;
 
-    // Convert the stored fuel efficiency if needed
-    const feNum = parseFloat(item.fuelEfficiency); // might be MPG or L/100
+    const feNum = parseFloat(item.fuelEfficiency);
     let displayFuel: string;
-    if (item.vehicleType === 'E-bike') {
-      // E-bike has no "mpg" but let's just show the stored string or N/A
-      displayFuel = 'N/A';
+    const isElectric = item.vehicleType === 'E-bike' || item.vehicleType === 'Subway';
+    const fuelUnit = item.fuelEfficiencyUnit || (isElectric ? 'mpge' : 'mpg');
+
+    if (fuelUnit === 'mpge') {
+      if (isMetric) {
+        const mpge = feNum;
+        const kmPerKWh = (convertMilesToKm(mpge) / 33.7).toFixed(2);
+        displayFuel = `${formatNumber(mpge)} MPGe (${kmPerKWh} km/kWh)`;
+      } else {
+        displayFuel = `${formatNumber(feNum)} MPGe`;
+      }
     } else {
       if (isMetric) {
-        // If stored was MPG, convert to L/100 km
-        // But if the user typed a custom L/100 in the Home screen, 
-        // that was already stored as a string. We only do a real conversion 
-        // if it was in MPG. So let's assume it was in the correct format:
-        // - If isMetric was true at calc time, `feNum` is already L/100.
-        // - If isMetric was false at calc time, `feNum` is MPG.
-        // For simplicity, let's always assume it's MPG if isMetric is false *now*.
-        // A safer approach is to store a "unitSystem" with the record, but we'll keep it simple.
-        // We'll just do a naive "MPG to L/100" conversion if isMetric is on:
-        // This might be approximate if user typed L/100 originally.
-        const mpgAsNumber = feNum; 
-        const lPer100km = convertMPGToLper100Km(mpgAsNumber);
-        displayFuel = formatNumber(lPer100km.toFixed(2)) + ' L/100 km';
+        if (fuelUnit === 'mpg') {
+          const lPer100km = convertMPGToLper100Km(feNum);
+          displayFuel = `${formatNumber(lPer100km.toFixed(2))} L/100 km`;
+        } else {
+          displayFuel = `${formatNumber(feNum)} L/100 km`;
+        }
       } else {
-        // Show it as MPG
-        displayFuel = formatNumber(feNum.toFixed(2)) + ' MPG';
+        if (fuelUnit === 'l/100km') {
+          const mpg = 235.214 / feNum;
+          displayFuel = `${formatNumber(mpg.toFixed(2))} MPG`;
+        } else {
+          displayFuel = `${formatNumber(feNum)} MPG`;
+        }
       }
     }
 
-    // Emissions
-    // The item’s emissions were stored in either lbs or kg, depending on the user’s system at the time.
-    // We can interpret them as lbs if isMetric = false, or convert to kg if isMetric = true.
-    const dayLbs = parseFloat(item.emissionsPerDay);
-    const weekLbs = parseFloat(item.emissionsPerWeek);
-    const yearLbs = parseFloat(item.emissionsPerYear);
+    const emissionsUnit = item.emissionsUnit || 'lbs';
+    const dayNum = parseFloat(item.emissionsPerDay);
+    const weekNum = parseFloat(item.emissionsPerWeek);
+    const yearNum = parseFloat(item.emissionsPerYear);
 
     const displayDay = isMetric
-      ? formatNumber(convertLbsToKg(dayLbs).toFixed(2)) + ' kg CO₂'
-      : formatNumber(dayLbs.toFixed(2)) + ' lbs CO₂';
+      ? `${formatNumber((emissionsUnit === 'kg' ? dayNum : convertLbsToKg(dayNum)).toFixed(2))} kg CO₂`
+      : `${formatNumber((emissionsUnit === 'lbs' ? dayNum : dayNum / 0.453592).toFixed(2))} lbs CO₂`;
 
     const displayWeek = isMetric
-      ? formatNumber(convertLbsToKg(weekLbs).toFixed(2)) + ' kg CO₂'
-      : formatNumber(weekLbs.toFixed(2)) + ' lbs CO₂';
+      ? `${formatNumber((emissionsUnit === 'kg' ? weekNum : convertLbsToKg(weekNum)).toFixed(2))} kg CO₂`
+      : `${formatNumber((emissionsUnit === 'lbs' ? weekNum : weekNum / 0.453592).toFixed(2))} lbs CO₂`;
 
     const displayYear = isMetric
-      ? formatNumber(convertLbsToKg(yearLbs).toFixed(2)) + ' kg CO₂'
-      : formatNumber(yearLbs.toFixed(2)) + ' lbs CO₂';
+      ? `${formatNumber((emissionsUnit === 'kg' ? yearNum : convertLbsToKg(yearNum)).toFixed(2))} kg CO₂`
+      : `${formatNumber((emissionsUnit === 'lbs' ? yearNum : yearNum / 0.453592).toFixed(2))} lbs CO₂`;
 
-    // Carbon credits
-    // The record was stored as lbs or kg. If we assume it's always lbs in the record, we can do:
-    const yearlyEmissionsNum = yearLbs; 
-    const carbonCredits = isMetric
-      ? (convertLbsToKg(yearlyEmissionsNum) / 1000).toFixed(2)
-      : (yearlyEmissionsNum / 2204.62).toFixed(2);
+    const yearKg = emissionsUnit === 'kg' ? yearNum : convertLbsToKg(yearNum);
+    const carbonCredits = (yearKg / 1000).toFixed(2);
     const displayCarbonCredits = `${formatNumber(carbonCredits)} carbon credits`;
 
     return (
@@ -234,29 +223,21 @@ export default function HistoryScreen() {
       <ThemedText type="title" style={[styles.title, { color: themeColors.text }]}>
         Calculation History
       </ThemedText>
-
-      {/* Measurement Toggle (shares the same @is_metric key) */}
       <View style={styles.toggleContainer}>
         <TouchableOpacity
           style={[
-            styles.toggleButton,  
-            { 
-              backgroundColor: themeColors.primary,
-              borderColor: themeColors.border,
-              borderWidth: 1,
-            }
+            styles.toggleButton,
+            { backgroundColor: themeColors.primary, borderColor: themeColors.border, borderWidth: 1 },
           ]}
           onPress={handleToggleMeasurement}
         >
-          <ThemedText style={[
-            styles.toggleButtonText, 
-            { color: colorScheme === 'dark' ? '#000' : '#fff' }
-          ]}>
+          <ThemedText
+            style={[styles.toggleButtonText, { color: colorScheme === 'dark' ? '#000' : '#fff' }]}
+          >
             {isMetric ? 'Switch to Imperial (Miles, lbs)' : 'Switch to Metric (KM, kg)'}
           </ThemedText>
         </TouchableOpacity>
       </View>
-
       <FlatList
         data={history}
         keyExtractor={(item) => item.id}
@@ -268,15 +249,12 @@ export default function HistoryScreen() {
         }
         contentContainerStyle={styles.listContent}
       />
-      
       {history.length > 0 && (
-        <TouchableOpacity 
-          style={[styles.clearButton, { backgroundColor: themeColors.danger }]} 
+        <TouchableOpacity
+          style={[styles.clearButton, { backgroundColor: themeColors.danger }]}
           onPress={clearHistory}
         >
-          <ThemedText style={styles.clearButtonText}>
-            Clear History
-          </ThemedText>
+          <ThemedText style={styles.clearButtonText}>Clear History</ThemedText>
         </TouchableOpacity>
       )}
     </ThemedView>

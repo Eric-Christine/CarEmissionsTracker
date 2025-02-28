@@ -18,27 +18,28 @@ import {
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import EmissionsComparisonChart from '@/components/EmissionsComparisonChart';
 
 // Define interface for vehicle data
 interface VehicleData {
   type: string;
-  mpg: number; // For non-electric vehicles; for E-bike this value is not used.
+  mpg: number; // MPG for gas vehicles, MPGe for electric vehicles
   description: string;
 }
 
-// CalculationRecord now stores numeric miles as a string, with no appended unit
+// CalculationRecord stores numeric miles as a string, without units
 interface CalculationRecord {
   id: string;
   date: string;
   miles: string;           // always in miles
   fuelEfficiency: string;  // either MPG or L/100 km (stored as typed string)
-  emissionsPerDay: string; // always in lbs or kg based on user’s choice at calc time
+  emissionsPerDay: string; // in lbs or kg based on user's choice at calculation time
   emissionsPerWeek: string;
   emissionsPerYear: string;
   vehicleType: string;
 }
 
-// Helper function to save the calculation record in AsyncStorage
+// Helper function to save calculation records in AsyncStorage
 const saveCalculationRecord = async (record: CalculationRecord) => {
   try {
     const existing = await AsyncStorage.getItem('@calculation_history');
@@ -56,7 +57,7 @@ const formatNumber = (value: string | number): string => {
   return isNaN(num) ? String(value) : num.toLocaleString('en-US');
 };
 
-// Define our available vehicle data
+// Define available vehicle data
 const vehicleData: { [key: string]: VehicleData } = {
   'Small Car': {
     type: 'Small Car',
@@ -75,7 +76,7 @@ const vehicleData: { [key: string]: VehicleData } = {
   },
   'SUV': {
     type: 'SUV',
-    mpg: 25,
+    mpg: 23,
     description: 'Sport Utility Vehicle (e.g., Ford Explorer, Honda CR-V)',
   },
   'Truck': {
@@ -91,15 +92,21 @@ const vehicleData: { [key: string]: VehicleData } = {
   },
   'E-bike': {
     type: 'E-bike',
-    mpg: 0, // Not applicable for electric bikes
+    mpg: 842, // MPGe based on ~0.04 kWh/mi and typical grid emissions
     description:
       'Electric bike. Emissions based on ~0.04 kWh/mi and 0.92 lbs CO₂/kWh.',
   },
   'Motorcycle': {
     type: 'Motorcycle',
-    mpg: 40, // Typical motorcycle MPG
+    mpg: 40,
     description:
-      'Motorcycle. Generally more fuel efficient than cars, but uses gasoline.',
+      'Motorcycle. More fuel efficient than cars, but uses gasoline.',
+  },
+  'Subway': {
+    type: 'Subway',
+    mpg: 198, // MPGe based on ~0.17 kWh/passenger-mile and typical grid emissions
+    description:
+      'Subway/Metro rail. Highly efficient mass transit with ~0.17 kWh/passenger-mile.',
   },
 };
 
@@ -443,7 +450,7 @@ export default function HomeScreen() {
   const scrollViewRef = useRef<ScrollView>(null);
 
   // Default vehicle
-  const defaultVehicleType = 'Small Car';
+  const defaultVehicleType = 'SUV';
 
   // Single global toggle: stored in AsyncStorage
   const [isMetric, setIsMetric] = useState<boolean>(false);
@@ -464,7 +471,7 @@ export default function HomeScreen() {
   }, []);
 
   // Distance input
-  const [miles, setMiles] = useState<string>('27');
+  const [miles, setMiles] = useState<string>('35');
   const [vehicleType, setVehicleType] = useState<string>(defaultVehicleType);
 
   // Fuel efficiency: MPG if Imperial, L/100 km if Metric
@@ -498,8 +505,7 @@ export default function HomeScreen() {
   const handleToggleMeasurement = async () => {
     const distanceValue = parseFloat(miles);
     if (!isNaN(distanceValue)) {
-      // If we're currently metric, convert to miles
-      // If currently imperial, convert to km
+      // If currently metric, convert to miles; if imperial, convert to km
       const converted = isMetric
         ? distanceValue / 1.60934
         : distanceValue * 1.60934;
@@ -533,7 +539,7 @@ export default function HomeScreen() {
       Alert.alert('Invalid Distance', 'Please enter a valid distance > 0.');
       return false;
     }
-    if (vehicleType !== 'E-bike') {
+    if (vehicleType !== 'E-bike' && vehicleType !== 'Subway') {
       const feNum = parseFloat(fuelEfficiency);
       if (isNaN(feNum) || feNum <= 0) {
         Alert.alert(
@@ -589,9 +595,14 @@ export default function HomeScreen() {
         emissionsPerDay = day.toFixed(2);
         emissionsPerWeek = week.toFixed(2);
         emissionsPerYear = year.toFixed(2);
-      } else if (vehicleType === 'E-bike') {
-        // ~0.04 kWh/mi, 0.92 lbs CO₂/kWh
-        let day = milesNum * 0.04 * 0.92;
+      } else if (vehicleType === 'E-bike' || vehicleType === 'Subway') {
+        // For electric vehicles with MPGe
+        // Convert MPGe to kWh/mile: 33.7 kWh = 1 gallon gasoline equivalent
+        const kWhPerMile = 33.7 / vehicleData[vehicleType].mpg;
+        // Use 0.92 lbs CO₂/kWh as average US grid emissions
+        const co2PerMile = kWhPerMile * 0.92;
+        
+        let day = milesNum * co2PerMile;
         let week = day * 5;
         let year = day * 5 * 52;
         if (isMetric) {
@@ -603,12 +614,11 @@ export default function HomeScreen() {
         emissionsPerWeek = week.toFixed(2);
         emissionsPerYear = year.toFixed(2);
       } else {
-        // For cars & motorcycles
+        // For traditional gas vehicles
         const feNum = parseFloat(fuelEfficiency);
-        // Convert L/100 km -> mpg if isMetric
         const mpgValue = !isMetric ? feNum : 235.214 / feNum;
         const gallonsUsed = milesNum / mpgValue;
-        // 1 gallon gas -> 19.6 lbs CO₂
+        // 19.6 lbs CO₂ per gallon of gasoline
         let day = gallonsUsed * 19.6;
         let week = day * 5;
         let year = day * 5 * 52;
@@ -773,8 +783,8 @@ export default function HomeScreen() {
             </View>
           </View>
 
-          {/* Fuel Efficiency Section (for non-E-bike vehicles) */}
-          {vehicleType !== 'E-bike' && (
+          {/* Fuel Efficiency Section (for non-E-bike and non-Subway vehicles) */}
+          {vehicleType !== 'E-bike' && vehicleType !== 'Subway' && (
             <View style={styles.sectionContainer}>
               <ThemedText style={styles.sectionTitle}>Fuel Efficiency</ThemedText>
               <View style={styles.efficiencyContainer}>
@@ -806,14 +816,30 @@ export default function HomeScreen() {
                     onChangeText={setFuelEfficiency}
                     placeholderTextColor={colors[theme].textSecondary}
                     onFocus={() => {
-                      // Scroll to bottom when the input is focused
                       setTimeout(() => {
                         scrollViewRef.current?.scrollToEnd({ animated: true });
                       }, 100);
                     }}
                   />
                   <ThemedText style={styles.helperText}>
-                    Only enter if you know your vehicle's exact fuel efficiency.
+                    Only enter if you know your vehicle’s exact fuel efficiency.
+                  </ThemedText>
+                </View>
+              </View>
+            </View>
+          )}
+
+          {/* Fuel Efficiency Section for E-bike and Subway */}
+          {(vehicleType === 'E-bike' || vehicleType === 'Subway') && (
+            <View style={styles.sectionContainer}>
+              <ThemedText style={styles.sectionTitle}>Fuel Efficiency</ThemedText>
+              <View style={styles.efficiencyContainer}>
+                <View style={styles.defaultFuelBox}>
+                  <ThemedText style={styles.defaultFuelLabel}>
+                    Default MPGe for {vehicleType}:
+                  </ThemedText>
+                  <ThemedText style={styles.defaultFuelValue}>
+                    {vehicleData[vehicleType].mpg} MPGe
                   </ThemedText>
                 </View>
               </View>
@@ -854,7 +880,15 @@ export default function HomeScreen() {
                   {yearlyEmissions && formatNumber(yearlyEmissions)} {isMetric ? 'kg' : 'lbs'}
                 </ThemedText>
               </ThemedText>
-
+              {/* Emissions Comparison Chart */}
+              <EmissionsComparisonChart 
+                currentEmissions={{
+                  daily: emissions,
+                  weekly: weeklyEmissions,
+                  yearly: yearlyEmissions
+                }}
+                isMetric={isMetric}
+              />
               {/* Carbon Credits */}
               <View style={styles.carbonCreditContainer}>
                 <ThemedText style={styles.carbonCreditTitle}>Carbon Credit Equivalent</ThemedText>
