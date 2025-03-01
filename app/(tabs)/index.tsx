@@ -590,8 +590,8 @@ export default function HomeScreen() {
         // perMilePerPerson = 22.45 / 6 / 15
         const perMilePerPerson = 22.45 / 6 / 15;
         let day = milesNum * perMilePerPerson;
-        let week = day * 5;
-        let year = day * 5 * 52;
+        let week = day * 7;
+        let year = day * 7 * 52;
         if (isMetric) {
           day *= 0.453592;
           week *= 0.453592;
@@ -608,8 +608,8 @@ export default function HomeScreen() {
         const co2PerMile = kWhPerMile * 0.92;
         
         let day = milesNum * co2PerMile;
-        let week = day * 5;
-        let year = day * 5 * 52;
+        let week = day * 7;
+        let year = day * 7 * 52;
         if (isMetric) {
           day *= 0.453592;
           week *= 0.453592;
@@ -625,8 +625,8 @@ export default function HomeScreen() {
         const gallonsUsed = milesNum / mpgValue;
         // 19.6 lbs CO₂ per gallon of gasoline
         let day = gallonsUsed * 19.6;
-        let week = day * 5;
-        let year = day * 5 * 52;
+        let week = day * 7;
+        let year = day * 7 * 52;
         if (isMetric) {
           day *= 0.453592;
           week *= 0.453592;

@@ -188,7 +188,7 @@ const EmissionsComparisonChart: React.FC<EmissionsComparisonChartProps> = ({
   const styles = createChartStyles(theme, largeScreen);
 
   // Subtract horizontal padding (16 left + 16 right = 32 total)
-  const chartWidth = screenWidth - 32;
+  const chartWidth = screenWidth - 8;
   // Limit chart height based on ratio and a max
   const chartHeight = largeScreen
     ? Math.min(chartWidth * 0.5, 300)
@@ -200,7 +200,7 @@ const EmissionsComparisonChart: React.FC<EmissionsComparisonChartProps> = ({
     right: chartWidth * 0.05,
     bottom: chartHeight * 0.15,
     // Slightly reduce the left padding so the chart doesn't overflow
-    left: chartWidth * (Platform.OS === 'ios' && !largeScreen ? 0.12 : 0.15),
+    left: chartWidth * (Platform.OS === 'ios' && !largeScreen ? 0.2 : 0.2),
   };
 
   // Parse emission values
