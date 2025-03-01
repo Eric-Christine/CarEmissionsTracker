@@ -2,7 +2,7 @@
   "expo": {
     "name": "Carbon Commute",
     "slug": "Carbon-Commute",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/images/CarbonCalculator.png",
     "scheme": "myapp",

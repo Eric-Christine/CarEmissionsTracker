@@ -476,7 +476,7 @@ export default function HomeScreen() {
   }, []);
 
   // Distance input
-  const [miles, setMiles] = useState<string>('35');
+  const [miles, setMiles] = useState<string>('30');
   const [vehicleType, setVehicleType] = useState<string>(defaultVehicleType);
 
   // Fuel efficiency: MPG if Imperial, L/100 km if Metric
@@ -666,8 +666,8 @@ export default function HomeScreen() {
 
   // For displaying results
   const dailyEmissions = emissions ? parseFloat(emissions) : 0;
-  const weeklyEmissions = emissions ? (dailyEmissions * 5).toFixed(0) : null;
-  const yearlyEmissions = emissions ? (dailyEmissions * 5 * 52).toFixed(0) : null;
+  const weeklyEmissions = emissions ? (dailyEmissions * 7).toFixed(0) : null;
+  const yearlyEmissions = emissions ? (dailyEmissions * 7 * 52).toFixed(0) : null;
   const yearlyCarbonCredits = emissions
     ? (dailyEmissions * 5 * 52 / (isMetric ? 1000 : 2204.62)).toFixed(2)
     : null;
@@ -874,7 +874,7 @@ export default function HomeScreen() {
                 </ThemedText>
               </ThemedText>
               <ThemedText style={styles.emissionsResult}>
-                Estimated Weekly CO₂ Emissions (5 days per week):{'\n'}
+                Estimated Weekly CO₂ Emissions:{'\n'}
                 <ThemedText style={styles.emissionsNumber}>
                   {weeklyEmissions && formatNumber(weeklyEmissions)} {isMetric ? 'kg' : 'lbs'}
                 </ThemedText>
